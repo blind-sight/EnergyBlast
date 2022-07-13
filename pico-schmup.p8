@@ -47,32 +47,20 @@ end
 function start_game()
 	score=0
 	mode="game"
-	
-	shipx=64
-	shipy=64
-	
-	--speed
-	shipsx=0
-	shipsy=0
-	
-		--bullet
-	bullx=40
-	bully=-10
-	
-	--muzzle
 	muzzle=0
 	
-	maxlives=3
-	lives=2
+	ship={x=64,y=64,spx=0,spy=0}
+	lives={max=3,curr=2}
+	stars={}	
+	bullets={}
 	
-	--stars
-	starx={}
-	stary={}
-	starspd={}
 	for i=1,100 do
-		add(starx,flr(rnd(128)))
-		add(stary,flr(rnd(128)))
-		add(starspd,rnd(1.5)+0.5)
+		local newstar={}
+		newstar.x=flr(rnd(128))
+		newstar.y=flr(rnd(128))
+		newstar.spd=rnd(1.5)+0.5
+		add(stars,newstar)
+
 	end
 	
 end
@@ -82,8 +70,18 @@ end
 function update_game()
 	handle_ship_controls()
 	
-	--moving the bullet
-	bully=bully-4
+	--moving bullets
+	--count backwards to not cause
+	--issues with removing bullets
+	--from the same array
+	for i=#bullets,1,-1 do
+		local bull=bullets[i]
+		bull.y=bull.y-4
+		
+		if bull.y<-8 then
+			del(bullets,bull)
+		end
+	end
 	
 	--animate flame
 	flamespr=flamespr+1
@@ -97,12 +95,11 @@ function update_game()
 	end
 	
 	--checking edges
-	if shipx>120 then
-		shipx=0
+	if ship.x>120 then
+		ship.x=0
 		sfx(0)
-	end
-	if shipx<0 then
-		shipx=120
+	elseif ship.x<0 then
+		ship.x=120
 		sfx(0)
 	end
 	
@@ -126,32 +123,36 @@ end
 
 function handle_ship_controls()
 	shipspr=2
-	shipsx=0
-	shipsy=0
+	ship.spx=0
+	ship.spy=0
 	if btn(0) then
-		shipsx=-2
+		ship.spx=-2
 		shipspr=1
 	elseif btn(1) then
-		shipsx=2
+		ship.spx=2
 		shipspr=3
 	elseif btn(2) then
-		shipsy=-2
+		ship.spy=-2
 	elseif btn(3) then
-		shipsy=2
+		ship.spy=2
 	end
 	
 	-- need to press btn
 	-- each time to fire
 	if btnp(5) then
-		bully=shipy-3
-		bullx=shipx
+		local bullet={
+			x=ship.x,
+			y=ship.y-3
+		}
+		
+		add(bullets,bullet)
 		sfx(1)
 		muzzle=5
 	end
 	
 	--moving the ship
-	shipx=shipx+shipsx
-	shipy=shipy+shipsy
+	ship.x=ship.x+ship.spx
+	ship.y=ship.y+ship.spy
 end
 -->8
 --draw
@@ -160,19 +161,23 @@ function draw_game()
 	cls(0)
 	
 	--ship
-	spr(shipspr,shipx,shipy)
-	spr(flamespr,shipx,shipy+8)
+	spr(shipspr,ship.x,ship.y)
+	spr(flamespr,ship.x,ship.y+8)
 	
 	--bullet
-	spr(bullspr,bullx,bully)
+	for i=1,#bullets do
+		local bull=bullets[i]
+		spr(bullspr,bull.x,bull.y)
+	end
+	
 	if muzzle>0 then
-		circfill(shipx+3,shipy-1,
+		circfill(ship.x+3,ship.y-1,
 			muzzle,7)
 	end
 	
 	print("score: "..score, 40,1,12)
-	for i=1,maxlives do 
-		if lives>=i then
+	for i=1,lives.max do 
+		if lives.curr>=i then
 			spr(heartspr,i*9,1)
 		else
 			spr(emptyheartspr,i*9,1)
@@ -200,32 +205,32 @@ function draw_over()
 
 end
 
-function draw_starfield()
-	for i=1,#starx do
+function draw_starfield()	
+	for i=1,#stars do
+		local star=stars[i]
 		local starcol=6
-		
-		if starspd[i]<1 then
+
+		if star.spd<1 then
 			starcol=1
-		elseif starspd[i]<1.5 then
+		elseif star.spd<1.5 then
 			starcol=13
 		end
 		
-		pset(starx[i],stary[i],
-			starcol)
+		pset(star.x,star.y,starcol)
+		
 	end
 	
 end
 
 function animate_starfield()
-	for i=1,#stary do
-		local sy=stary[i]
+	for i=1,#stars do
+		local star=stars[i]
 		
-		sy=sy+starspd[i]
-		if sy>128 then
-			sy=sy-128
+		star.y=star.y+star.spd
+		if star.y>128 then
+			star.y=star.y-128
 		end
 		
-		stary[i]=sy
 	end
 
 end
