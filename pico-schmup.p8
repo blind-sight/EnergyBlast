@@ -7,21 +7,20 @@ function _init()
 	cls(0)
 	
 	--sprites
-	shipspr=2
-	bullspr=16
 	flamespr=5
 	heartspr=12
 	emptyheartspr=13
 	
 	mode="start"
 	blinkt=0
-	
+	t=0 --number of frames
 end
 
 -- (gameplay hard 30fps)
 function _update()
 	blinkt+=1
-
+	t+=1
+	
 	if mode=="game" then
 		update_game()
 	elseif mode=="start" then
@@ -29,7 +28,6 @@ function _update()
 	elseif mode=="over" then
 		update_over()
 	end
-	
 end
 
 -- (soft 30 fps)
@@ -41,28 +39,32 @@ function _draw()
 	elseif mode=="over" then
 		draw_over()
 	end
-	
 end
 
 function start_game()
 	score=0
 	mode="game"
 	muzzle=0
+	bulltimer=0
 	
-	ship={x=64,y=64,spx=0,spy=0}
+	ship={x=64,y=64,spr=2,
+		spx=0,spy=0}
 	lives={max=3,curr=2}
+	invul=0 --invulnerability
 	stars={}	
 	bullets={}
+	enemies={}
+	
+	spawnenemy()
 	
 	for i=1,100 do
-		local newstar={}
-		newstar.x=flr(rnd(128))
-		newstar.y=flr(rnd(128))
-		newstar.spd=rnd(1.5)+0.5
+		local newstar={
+			x=flr(rnd(128)),
+			y=flr(rnd(128)),
+			spd=rnd(1.5)+0.5
+		}
 		add(stars,newstar)
-
 	end
-	
 end
 -->8
 --update
@@ -76,11 +78,57 @@ function update_game()
 	--from the same array
 	for i=#bullets,1,-1 do
 		local bull=bullets[i]
-		bull.y=bull.y-4
+		bull.y-=4
 		
 		if bull.y<-8 then
 			del(bullets,bull)
 		end
+	end
+	
+	--moving enemies
+	for enemy in all(enemies) do
+		enemy.y+=1
+		enemy.spr+=0.4
+		
+		if enemy.spr>25 then
+			enemy.spr=21
+		end
+		
+		if enemy.y>128 then
+			del(enemies, enemy)
+			spawnenemy()
+		end
+	end
+	
+	--collision enemies x bullets
+	for enemy in all(enemies) do
+		for bull in all(bullets) do
+			if collision(enemy,bull) then
+				del(enemies,enemy)
+				del(bullets,bull)
+				sfx(3)
+				score+=1
+				spawnenemy()
+			end
+		end
+	end
+	
+	--collision ship x enemies
+	if invul==0 then
+		for enemy in all(enemies) do
+			if collision(enemy,ship) then
+				lives.curr-=1
+				sfx(1)
+				invul=60
+			end
+		end
+	else 
+		invul-=1
+	end
+	
+	if lives.curr<=0 then
+		mode="over"
+		return
 	end
 	
 	--animate flame
@@ -91,7 +139,7 @@ function update_game()
 	
 	--animate muzzle flash
 	if muzzle>0 then
-		muzzle=muzzle-1
+		muzzle-=1
 	end
 	
 	--checking edges
@@ -102,72 +150,98 @@ function update_game()
 		ship.x=120
 		sfx(0)
 	end
-	
+	if ship.y<0 then
+		ship.y=0
+		sfx(0)
+	end
+	if ship.y>120 then
+		ship.y=120
+		sfx(0)
+	end
 end
-
 
 function update_start()
 	if btnp(4) or btnp(5) then
 		start_game()
 	end
-
 end
 
 function update_over()
 	if btnp(4) or btnp(5) then
 		mode="start"
 	end
-
 end
 
 
 function handle_ship_controls()
-	shipspr=2
+	ship.spr=2
 	ship.spx=0
 	ship.spy=0
 	if btn(0) then
 		ship.spx=-2
-		shipspr=1
-	elseif btn(1) then
+		ship.spr=1
+	end
+	if btn(1) then
 		ship.spx=2
-		shipspr=3
-	elseif btn(2) then
+		ship.spr=3
+	end
+	if btn(2) then
 		ship.spy=-2
-	elseif btn(3) then
+	end
+	if btn(3) then
 		ship.spy=2
 	end
 	
 	-- need to press btn
 	-- each time to fire
-	if btnp(5) then
-		local bullet={
-			x=ship.x,
-			y=ship.y-3
-		}
-		
-		add(bullets,bullet)
-		sfx(1)
-		muzzle=5
+	if btn(5) then
+		if bulltimer<=0 then
+			local bullet={
+				x=ship.x,
+				y=ship.y-3,
+				spr=16
+			}
+			
+			add(bullets,bullet)
+			sfx(1)
+			muzzle=5
+			bulltimer=4
+		end
 	end
+	bulltimer-=1
 	
 	--moving the ship
-	ship.x=ship.x+ship.spx
-	ship.y=ship.y+ship.spy
+	ship.x+=ship.spx
+	ship.y+=ship.spy
 end
 -->8
 --draw
 
 function draw_game()
 	cls(0)
+	draw_starfield()
+	animate_starfield()
 	
 	--ship
-	spr(shipspr,ship.x,ship.y)
-	spr(flamespr,ship.x,ship.y+8)
+	if invul<=0 then
+		drawspr(ship)
+		spr(flamespr,ship.x,ship.y+8)	
+	else
+		--invul state
+		if sin(t/5)<0.1 then
+			drawspr(ship)
+			spr(flamespr,ship.x,ship.y+8)
+		end
+	end
 	
-	--bullet
-	for i=1,#bullets do
-		local bull=bullets[i]
-		spr(bullspr,bull.x,bull.y)
+	--bullets
+	for bull in all(bullets) do
+		drawspr(bull)
+	end
+	
+	--enemies
+	for enemy in all(enemies) do
+		drawspr(enemy)
 	end
 	
 	if muzzle>0 then
@@ -176,6 +250,7 @@ function draw_game()
 	end
 	
 	print("score: "..score, 40,1,12)
+	
 	for i=1,lives.max do 
 		if lives.curr>=i then
 			spr(heartspr,i*9,1)
@@ -183,10 +258,6 @@ function draw_game()
 			spr(emptyheartspr,i*9,1)
 		end
 	end
-	
-	draw_starfield()
-	animate_starfield()
-
 end
 
 function draw_start()
@@ -194,7 +265,6 @@ function draw_start()
 	print("pico schmup",40,40,12)
 	print("press any key to start",
 		20,80,blink())
-
 end
 
 function draw_over()
@@ -202,12 +272,10 @@ function draw_over()
 	print("game over",45,40,12)
 	print("press any key to continue",
 		15,80,blink())
-
 end
 
 function draw_starfield()	
-	for i=1,#stars do
-		local star=stars[i]
+	for star in all(stars) do		
 		local starcol=6
 
 		if star.spd<1 then
@@ -217,22 +285,16 @@ function draw_starfield()
 		end
 		
 		pset(star.x,star.y,starcol)
-		
 	end
-	
 end
 
 function animate_starfield()
-	for i=1,#stars do
-		local star=stars[i]
-		
-		star.y=star.y+star.spd
+	for star in all(stars) do		
+		star.y+=star.spd
 		if star.y>128 then
-			star.y=star.y-128
-		end
-		
+			star.y-=128
+		end	
 	end
-
 end
 -->8
 --tools
@@ -246,7 +308,34 @@ function blink()
 	end
 	
 	return blinkanim[blinkt]
+end
+
+function drawspr(obj)
+		spr(obj.spr,obj.x,obj.y)
+end
+
+function collision(a,b)
+	local a_left=a.x
+	local a_top=a.y
+	local a_right=a.x+7 --not 8
+	local a_bottom=a.y+7
 	
+	local b_left=b.x
+	local b_top=b.y
+	local b_right=b.x+7
+	local b_bottom=b.y+7
+	
+	if a_top>b_bottom then return false end
+	if b_top>a_bottom then return false end
+	if a_left>b_right then return false end
+	if b_left>a_right then return false end
+	
+	return true
+end
+
+function spawnenemy()
+	local enemy={x=rnd(120),y=-8,spr=21}
+	add(enemies,enemy)
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
@@ -257,13 +346,16 @@ __gfx__
 007007000311bb303bb11bb303bb1130000000000000000000011000000000000000000000000000000000000000000000888800008008000000000000000000
 00000000035563303b6556b303365530000000000000000000000000000000000000000000000000000000000000000000088000000880000000000000000000
 00000000006996000369963000699600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00099000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-009aa900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-09a77a90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-09a77a90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-009aa900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00099000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000330033003300330033003300330033000000000000000000000000000000000000000000000000000000000
+000990000000000000000000000000000000000033b33b3333b33b3333b33b3333b33b3300000000000000000000000000000000000000000000000000000000
+009aa900000000000000000000000000000000003bbbbbb33bbbbbb33bbbbbb33bbbbbb300000000000000000000000000000000000000000000000000000000
+09a77a90000000000000000000000000000000003b7717b33b7717b33b7717b33b7717b300000000000000000000000000000000000000000000000000000000
+09a77a90000000000000000000000000000000000b7117b00b7117b00b7117b00b7117b000000000000000000000000000000000000000000000000000000000
+009aa900000000000000000000000000000000000037730000377300003773000037730000000000000000000000000000000000000000000000000000000000
+00099000000000000000000000000000000000000303303003033030030330300303303000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000300003030000003030000300330033000000000000000000000000000000000000000000000000000000000
 __sfx__
 000100001e7301d7401d760127601177012770207701e7701d7701977019770187701777017770167701677016770197601b7601e760207502375024740247402373022730207301f7301e7301d7301b73017730
-0102000032550305502c55026550215501c5501855014550115500f5500c550095500855006550035500155000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0002000032550305502c55026550215501c5501855014550115500f5500c550095500855006550035500155000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000100002c650346502f65027650216501b650156501365011650106500f6500b6500965008650056500365003650000000000000000000000000000000000000000000000000000000000000000000000000000
+0001000034750096502f530206200f620085200552002720007100060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
