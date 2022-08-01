@@ -54,8 +54,8 @@ function start_game()
 	stars={}	
 	bullets={}
 	enemies={}
-	
-	particles={}
+	particles={}	
+	shockwaves={}
 	
 	spawnenemy()
 	
@@ -107,6 +107,8 @@ function update_game()
 		for bull in all(bullets) do
 			if collision(enemy,bull) then
 				del(bullets,bull)
+				shockwave(bull.x,bull.y,false)
+				spark(bull.x+4,bull.y+4,false)
 				enemy.hp-=1
 				sfx(4)
 				enemy.flash=2
@@ -125,7 +127,8 @@ function update_game()
 	--collision ship x enemies
 	if invul==0 then
 		for enemy in all(enemies) do
-			if collision(enemy,ship) then
+			if collision(enemy,ship) then			
+				explode(ship.x+4,ship.y+4,true)
 				lives.curr-=1
 				sfx(1)
 				invul=60
@@ -268,24 +271,19 @@ function draw_game()
 	for part in all(particles) do
 		local pc=7
 		
-		if part.age>5 then
-			pc=10
+		if part.blue then
+			pc=part_col_blue(part.age)
+		else
+			pc=part_col_red(part.age)
 		end
-		if part.age>7 then
-			pc=9
+		
+		if part.spark then
+			pset(part.x,part.y,7)
+		else
+	 	circfill(part.x,part.y,
+	 		part.size,pc)
 		end
-		if part.age>10 then
-			pc=8
-		end
-		if part.age>12 then
-			pc=2
-		end
-		if part.age>15 then
-			pc=5
-		end
-				
-	 circfill(part.x,part.y,
-	 	part.size,pc)
+		
 		part.x+=part.spdx
 		part.y+=part.spdy
 		part.age+=1
@@ -297,6 +295,16 @@ function draw_game()
 			if part.size<0 then
 				del(particles,part)
 			end
+		end
+	end
+	
+	--shockwaves
+	for shock in all(shockwaves) do
+		circ(shock.x+4,shock.y+4,
+			shock.r,shock.col)
+		shock.r+=shock.spd
+		if shock.r>shock.maxr then
+			del(shockwaves,shock)
 		end
 	end
 	
@@ -401,7 +409,7 @@ function spawnenemy()
 	add(enemies,enemy)
 end
 
-function explode(x,y)
+function explode(x,y,isblue)
 
 	local bigparticle={
 		x=x,
@@ -410,7 +418,8 @@ function explode(x,y)
 		spdy=0,
 		age=0,
 		maxage=0,
-		size=10
+		size=10,
+		blue=isblue
 	}
 	
 	add(particles,bigparticle)
@@ -419,13 +428,100 @@ function explode(x,y)
 		local particle={
 			x=x,
 			y=y,
-			spdx=rnd()*6-3,
-			spdy=rnd()*6-3,
+			spdx=(rnd()-0.5)*6,
+			spdy=(rnd()-0.5)*6,
 			age=rnd(2),
 			maxage=10+rnd(10),
-			size=1+rnd(4)
+			size=1+rnd(4),
+			blue=isblue
 		}
 		
+		add(particles,particle)
+	end
+	
+	spark(x,y,true)
+	shockwave(x,y,true)
+end
+
+function part_col_red(age)
+		local col=7
+		
+		if age>5 then
+			col=10
+		end
+		if age>7 then
+			col=9
+		end
+		if age>10 then
+			col=8
+		end
+		if age>12 then
+			col=2
+		end
+		if age>15 then
+			col=5
+		end
+		
+		return col
+end
+
+function part_col_blue(age)
+		local col=7
+		
+		if age>5 then
+			col=6
+		end
+		if age>7 then
+			col=12
+		end
+		if age>10 then
+			col=13
+		end
+		if age>12 then
+			col=1
+		end
+		if age>15 then
+			col=1
+		end
+		
+		return col
+end
+
+function shockwave(x,y,col,isbig)
+	local shock={
+		x=x,
+		y=y,
+		r=3, --radius
+		maxr=isbig and 25 or 6, --max radius
+		col=isbig and 7 or 9,
+		spd=isbig and 3.5 or 1
+	}
+	add(shockwaves,shock)
+end
+
+function spark(x,y,isbig)
+	local no=2
+	local tspdx=(rnd()-0.5)*8
+	local tspdy=(rnd()-1)*3
+	
+	if isbig then
+		no=20
+		tspdx=(rnd()-0.5)*12
+		tspdy=(rnd()-0.5)*12
+	end
+		
+	for i=1,no do
+		local particle={
+			x=x,
+			y=y,
+			spdx=tspdx,
+			spdy=tspdy,
+			age=rnd(2),
+			maxage=10+rnd(10),
+			size=1+rnd(4),
+			blue=isblue,
+			spark=true
+		}
 		add(particles,particle)
 	end
 end
