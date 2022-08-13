@@ -108,7 +108,7 @@ function update_game()
 	
 	--moving enemies
 	for enemy in all(enemies) do
-	 executemission(enemy)
+	 execute_behavior(enemy)
 		
 		--animation
 		enemy.animframe+=0.4
@@ -165,6 +165,8 @@ function update_game()
 		music(6)
 		return
 	end
+	
+	change_behavior()
 	
 	--animate flame
 	flamespr=flamespr+1
@@ -620,10 +622,17 @@ function makespr()
 	
 	return spr
 end
+
+function anim_easing(obj,n)
+		--x+=(targetx-x)/n
+		obj.y+=(obj.posy-obj.y)/n
+		obj.x+=(obj.posx-obj.x)/n
+end
 -->8
 --waves and enemies
 
 function spawnwave() 
+	sfx(28)
 	if wave==1 then
 		placeenemies({
 			{0,1,1,1,1,1,1,1,1,0},
@@ -660,7 +669,8 @@ function placeenemies(lvl)
 		local line=lvl[y]
 		for x=1,10 do 
 			if line[x]!=0 then
-				spawnenemy(line[x],x*12-6,4+y*12)
+				spawnenemy(line[x],
+					x*12-6,4+y*12,x*3)
 			end
 		end
 	end
@@ -687,12 +697,13 @@ function nextwave()
 	end
 end
 
-function spawnenemy(type,x,y)
+function spawnenemy(type,x,y,w)
 	local enemy=makespr()
 	enemy.posx=x --intended pos
 	enemy.posy=y
-	enemy.mission="flyin"
-	enemy.x=x
+	enemy.behavior="flyin"
+	enemy.wait=w
+	enemy.x=x*1.25-16
 	enemy.y=y-64
 	
 	if type==nil or type==1 then
@@ -722,18 +733,38 @@ end
 -->8
 --behavior
 
-function executemission(enemy)
-	if enemy.mission=="flyin" then
-		enemy.y+=1
-		if enemy.y>=enemy.posy then
-			enemy.mission="hover"
+function execute_behavior(enemy)
+	if enemy.wait>0 then
+		enemy.wait-=1
+		return
+	end
+	
+	if enemy.behavior=="flyin" then
+		anim_easing(enemy,7)
+		
+		if abs(enemy.y-enemy.posy)<0.7 then
+			enemy.behavior="hover"
 		end
-	elseif enemy.mission=="hover" then
+	elseif enemy.behavior=="hover" then
 		
-	elseif enemy.mission=="attack" then
-		
+	elseif enemy.behavior=="attack" then
+		enemy.y+=1
 	end 
 
+end
+
+function change_behavior()
+	if mode!="game" then
+		return
+	end
+	
+	if t%60==0 then
+		local enemy=rnd(enemies)
+		if enemy.behavior=="hover" then
+			enemy.behavior="attack"
+		end
+	end
+	
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
@@ -884,6 +915,7 @@ __sfx__
 510c0000143151931520325143251931520315163251932516315183151932516325183151931516325183251b3151e315183251b3251e315183151b3251e325183151b3151d325183251b3151d315183251b325
 010c00000175001750017500175001750017500175001750037500375003750037500375003750037500375006750067500675006750067500675006750067500575005750057500575005750057500575005750
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
+110400003e5723d5723b572385723457231572305622d5622b562285622556223562215621f5521e5521c5521b55218552165421454212532115220f5220e5220d5220c5120a5120851207512055120351202512
 __music__
 04 04050644
 00 07084749
