@@ -108,7 +108,9 @@ function update_game()
 	
 	--moving enemies
 	for enemy in all(enemies) do
-		enemy.y+=1
+	 executemission(enemy)
+		
+		--animation
 		enemy.animframe+=0.4
 		if flr(enemy.animframe)>#enemy.anim then
 			enemy.animframe=1
@@ -116,6 +118,7 @@ function update_game()
 
 		enemy.spr=enemy.anim[flr(enemy.animframe)]
 		
+		--leaving screen
 		if enemy.y>128 then
 			del(enemies, enemy)
 		end
@@ -621,7 +624,48 @@ end
 --waves and enemies
 
 function spawnwave() 
-	spawnenemy(wave)
+	if wave==1 then
+		placeenemies({
+			{0,1,1,1,1,1,1,1,1,0},
+			{0,1,1,1,1,1,1,1,1,0},
+			{0,1,1,1,1,1,1,1,1,0},
+			{0,1,1,1,1,1,1,1,1,0}
+		})
+	elseif wave==2 then
+		placeenemies({
+			{1,1,1,2,2,2,2,1,1,1},
+			{1,1,1,2,2,2,2,1,1,1},
+			{1,1,1,2,2,2,2,1,1,1},
+			{1,1,2,2,2,2,2,2,1,1}
+		})
+	elseif wave==3 then
+		placeenemies({
+			{3,3,0,2,2,2,2,0,3,3},
+			{3,3,0,2,2,2,2,0,3,3},
+			{3,3,0,1,1,1,1,0,3,3},
+			{3,3,0,1,0,0,1,0,3,3}
+		})
+	elseif wave==4 then
+		placeenemies({
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,4,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0},
+			{0,0,0,0,0,0,0,0,0,0}
+		})
+	end
+end
+
+function placeenemies(lvl)
+	for y=1,4 do
+		local line=lvl[y]
+		for x=1,10 do 
+			if line[x]!=0 then
+				spawnenemy(line[x],x*12-6,4+y*12)
+			end
+		end
+	end
+	
+	
 end
 
 function nextwave()
@@ -643,14 +687,17 @@ function nextwave()
 	end
 end
 
-function spawnenemy(type)
+function spawnenemy(type,x,y)
 	local enemy=makespr()
-	enemy.x=rnd(120)
-	enemy.y=-8
+	enemy.posx=x --intended pos
+	enemy.posy=y
+	enemy.mission="flyin"
+	enemy.x=x
+	enemy.y=y-64
 	
 	if type==nil or type==1 then
 		enemy.spr=21
-		enemy.hp=5
+		enemy.hp=3
 		enemy.anim={21,22,23,24}
 	elseif type==2 then
 		enemy.spr=148
@@ -671,6 +718,22 @@ function spawnenemy(type)
 	end
 	
 	add(enemies,enemy)
+end
+-->8
+--behavior
+
+function executemission(enemy)
+	if enemy.mission=="flyin" then
+		enemy.y+=1
+		if enemy.y>=enemy.posy then
+			enemy.mission="hover"
+		end
+	elseif enemy.mission=="hover" then
+		
+	elseif enemy.mission=="attack" then
+		
+	end 
+
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
