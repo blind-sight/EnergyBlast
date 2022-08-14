@@ -77,6 +77,8 @@ function start_game()
 	enemies={}
 	particles={}	
 	shockwaves={}
+	
+	attackfreq=60
 		
 	for i=1,100 do
 		local newstar={
@@ -111,7 +113,7 @@ function update_game()
 	 execute_behavior(enemy)
 		
 		--animation
-		enemy.animframe+=0.4
+		enemy.animframe+=enemy.animsp
 		if flr(enemy.animframe)>#enemy.anim then
 			enemy.animframe=1
 		end
@@ -119,8 +121,11 @@ function update_game()
 		enemy.spr=enemy.anim[flr(enemy.animframe)]
 		
 		--leaving screen
-		if enemy.y>128 then
-			del(enemies, enemy)
+		if enemy.behavior!="flyin" then
+			if enemy.y>128 or enemy.x<-8
+			or enemy.x>128 then
+				del(enemies, enemy)
+			end
 		end
 	end
 	
@@ -461,7 +466,15 @@ function blink()
 end
 
 function drawspr(obj)
-		spr(obj.spr,obj.x,obj.y,
+	local sprx=obj.x
+	local spry=obj.y
+	
+	if obj.shake>0 then
+		obj.shake-=1
+		sprx+=abs(sin(t/2.5))
+	end
+	
+	spr(obj.spr,sprx,spry,
 			obj.sprw,obj.sprh)
 end
 
@@ -611,7 +624,10 @@ function makespr()
 	local spr={
 		x=0,
 		y=0,
+		spx=0,
+		spy=0,
 		flash=0,
+		shake=0,
 		animframe=1,
 		spr=0,
 		sprw=1,
@@ -633,14 +649,17 @@ end
 
 function spawnwave() 
 	sfx(28)
+	
 	if wave==1 then
+		attackfreq=60
 		placeenemies({
-			{0,1,1,1,1,1,1,1,1,0},
-			{0,1,1,1,1,1,1,1,1,0},
-			{0,1,1,1,1,1,1,1,1,0},
-			{0,1,1,1,1,1,1,1,1,0}
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1},
+			{1,1,1,1,1,1,1,1,1,1}
 		})
 	elseif wave==2 then
+		attackfreq=60
 		placeenemies({
 			{1,1,1,2,2,2,2,1,1,1},
 			{1,1,1,2,2,2,2,1,1,1},
@@ -648,6 +667,7 @@ function spawnwave()
 			{1,1,2,2,2,2,2,2,1,1}
 		})
 	elseif wave==3 then
+		attackfreq=60
 		placeenemies({
 			{3,3,0,2,2,2,2,0,3,3},
 			{3,3,0,2,2,2,2,0,3,3},
@@ -655,6 +675,7 @@ function spawnwave()
 			{3,3,0,1,0,0,1,0,3,3}
 		})
 	elseif wave==4 then
+		attackfreq=60
 		placeenemies({
 			{0,0,0,0,0,0,0,0,0,0},
 			{0,0,0,4,0,0,0,0,0,0},
@@ -705,6 +726,8 @@ function spawnenemy(type,x,y,w)
 	enemy.wait=w
 	enemy.x=x*1.25-16
 	enemy.y=y-64
+	enemy.type=type
+	enemy.animsp=0.4
 	
 	if type==nil or type==1 then
 		enemy.spr=21
@@ -748,7 +771,52 @@ function execute_behavior(enemy)
 	elseif enemy.behavior=="hover" then
 		
 	elseif enemy.behavior=="attack" then
-		enemy.y+=1
+		if enemy.type==1 then
+				enemy.spy=1.7
+				enemy.spx=sin(t/45)
+				
+				--if near the edge of screen
+				--move more to center
+				if enemy.x<32 then
+					enemy.spx+=1-(enemy.x/32)
+				end
+				if enemy.x>88 then
+					enemy.spx-=(enemy.x-88)/32
+				end
+		elseif enemy.type==2 then
+				enemy.spy=2.5
+				enemy.spx=sin(t/20)
+				
+				--if near the edge of screen
+				--move more to center
+				if enemy.x<32 then
+					enemy.spx+=1-(enemy.x/32)
+				end
+				if enemy.x>88 then
+					enemy.spx-=(enemy.x-88)/32
+				end
+		elseif enemy.type==3 then
+			if enemy.spx==0 then
+				enemy.spy=2
+				if ship.y<=enemy.y then
+					enemy.spy=0
+					if ship.x<enemy.x then
+						enemy.spx=-2
+					else
+						enemy.spx=2
+					end
+				end
+			end
+		
+		elseif enemy.type==4 then
+			enemy.spy=0.35
+			
+			if enemy.y>110 then
+				enemy.spy=1
+			end
+		end
+		
+		move(enemy)	
 	end 
 
 end
@@ -758,13 +826,26 @@ function change_behavior()
 		return
 	end
 	
-	if t%60==0 then
-		local enemy=rnd(enemies)
+	if t%attackfreq==0 then
+		--select bottom row enemies
+		local maxnum=min(10,#enemies)
+		local index=flr(rnd(maxnum))	
+		index=#enemies-index
+		
+		local enemy=enemies[index]
 		if enemy.behavior=="hover" then
 			enemy.behavior="attack"
+			enemy.animsp*=3
+			enemy.wait=60
+			enemy.shake=60
 		end
 	end
 	
+end
+
+function move(obj)
+	obj.x+=obj.spx
+	obj.y+=obj.spy
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
