@@ -69,16 +69,18 @@ function start_game()
 	ship.spr=2
 	ship.spx=0
 	ship.spy=0
+	ship.lives={max=3,curr=1}
+	ship.invul=0 --invulnerability
 	
-	lives={max=3,curr=1}
-	invul=0 --invulnerability
 	stars={}	
 	bullets={}
+	enembullets={}
 	enemies={}
 	particles={}	
 	shockwaves={}
 	
 	attackfreq=60
+	nextfire=0
 		
 	for i=1,100 do
 		local newstar={
@@ -96,36 +98,28 @@ function update_game()
 	handle_ship_controls()
 	
 	--moving bullets
-	--count backwards to not cause
-	--issues with removing bullets
-	--from the same array
-	for i=#bullets,1,-1 do
-		local bull=bullets[i]
-		bull.y-=4
+	for bull in all (bullets) do
+		move(bull)
 		
-		if bull.y<-8 then
-			del(bullets,bull)
-		end
+		del_outside_screen(bull,bullets)
+	end
+	
+	--move enemy bullets
+	for enembull in all (enembullets) do
+		move(enembull)
+		animate(enembull)		
+		del_outside_screen(enembull,enembullets)
 	end
 	
 	--moving enemies
 	for enemy in all(enemies) do
 	 execute_behavior(enemy)
 		
-		--animation
-		enemy.animframe+=enemy.animsp
-		if flr(enemy.animframe)>#enemy.anim then
-			enemy.animframe=1
-		end
-
-		enemy.spr=enemy.anim[flr(enemy.animframe)]
+		animate(enemy)
 		
 		--leaving screen
 		if enemy.behavior!="flyin" then
-			if enemy.y>128 or enemy.x<-8
-			or enemy.x>128 then
-				del(enemies, enemy)
-			end
+			del_outside_screen(enemy,enemies)
 		end
 	end
 	
@@ -137,41 +131,50 @@ function update_game()
 				shockwave(bull.x,bull.y,false)
 				spark(bull.x+4,bull.y+4,false)
 				enemy.hp-=1
-				sfx(4)
+				sfx(3)
 				enemy.flash=2
 				
 				if enemy.hp<=0 then
-					del(enemies,enemy)
-					sfx(3)
-					score+=1
-					explode(enemy.x+4,enemy.y+4)
+					killenemy(enemy)
 				end
 			end
 		end
 	end
 	
 	--collision ship x enemies
-	if invul==0 then
+	if ship.invul==0 then
 		for enemy in all(enemies) do
 			if collision(enemy,ship) then			
 				explode(ship.x+4,ship.y+4,true)
-				lives.curr-=1
-				sfx(2)
-				invul=60
+				ship.lives.curr-=1
+				sfx(1)
+				ship.invul=60
 			end
 		end
 	else 
-		invul-=1
+		ship.invul-=1
 	end
 	
-	if lives.curr<=0 then
+	--collision ship x enemy bullets
+	if ship.invul==0 then
+		for enembull in all(enembullets) do
+			if collision(enembull,ship) then			
+				explode(ship.x+4,ship.y+4,true)
+				ship.lives.curr-=1
+				sfx(1)
+				ship.invul=60
+			end
+		end
+	end
+	
+	if ship.lives.curr<=0 then
 		mode="over"
 		btnlockout=t+30
 		music(6)
 		return
 	end
 	
-	change_behavior()
+	picktimer()
 	
 	--animate flame
 	flamespr=flamespr+1
@@ -287,6 +290,7 @@ function handle_ship_controls()
 			bullet.y=ship.y-3
 			bullet.spr=16
 			bullet.colw=6
+			bullet.spy=-4
 			
 			add(bullets,bullet)
 			sfx(1)
@@ -309,8 +313,8 @@ function draw_game()
 	animate_starfield()
 	
 	--ship
-	if lives.curr>0 then
-		if invul<=0 then
+	if ship.lives.curr>0 then
+		if ship.invul<=0 then
 			drawspr(ship)
 			spr(flamespr,ship.x,ship.y+8)	
 		else
@@ -386,10 +390,15 @@ function draw_game()
 		end
 	end
 	
+	--enemy bullets
+	for enembull in all(enembullets) do
+		drawspr(enembull)
+	end
+	
 	print("score: "..score, 40,1,12)
 	
-	for i=1,lives.max do 
-		if lives.curr>=i then
+	for i=1,ship.lives.max do 
+		if ship.lives.curr>=i then
 			spr(heartspr,i*9,1)
 		else
 			spr(emptyheartspr,i*9,1)
@@ -471,7 +480,16 @@ function drawspr(obj)
 	
 	if obj.shake>0 then
 		obj.shake-=1
-		sprx+=abs(sin(t/2.5))
+
+		-- <2 to get even shake
+		if t%4<2 then
+			sprx+=1
+		end
+	end
+	
+	if obj.bulmode then
+		sprx-=2
+		spry-=2
 	end
 	
 	spr(obj.spr,sprx,spry,
@@ -504,7 +522,6 @@ function replacecolors(color)
 end
 
 function explode(x,y,isblue)
-
 	local bigparticle={
 		x=x,
 		y=y,
@@ -644,6 +661,13 @@ function anim_easing(obj,n)
 		obj.y+=(obj.posy-obj.y)/n
 		obj.x+=(obj.posx-obj.x)/n
 end
+
+function del_outside_screen(obj,array)
+	if obj.y>128 or obj.y<-8
+		or obj.x>128 or obj.x<-8 then
+		del(array,obj)
+	end
+end
 -->8
 --waves and enemies
 
@@ -695,8 +719,6 @@ function placeenemies(lvl)
 			end
 		end
 	end
-	
-	
 end
 
 function nextwave()
@@ -821,31 +843,100 @@ function execute_behavior(enemy)
 
 end
 
-function change_behavior()
+function picktimer()
 	if mode!="game" then
 		return
 	end
 	
 	if t%attackfreq==0 then
-		--select bottom row enemies
+		pick_attack()
+	end
+	
+	if t>nextfire then
+		pick_fire()
+		nextfire=t+20+rnd(20)
+	end
+end
+
+function pick_attack()
+			--select bottom row enemies
 		local maxnum=min(10,#enemies)
 		local index=flr(rnd(maxnum))	
 		index=#enemies-index
 		
 		local enemy=enemies[index]
+		
+		if enemy==nil then return end
+		
 		if enemy.behavior=="hover" then
 			enemy.behavior="attack"
 			enemy.animsp*=3
 			enemy.wait=60
 			enemy.shake=60
 		end
-	end
-	
+end
+
+function pick_fire()
+			--select bottom row enemies
+		local maxnum=min(10,#enemies)
+		local index=flr(rnd(maxnum))	
+		index=#enemies-index
+		
+		local enemy=enemies[index]
+		if enemy==nil then return end
+		
+		if enemy.behavior=="hover" then
+			fire(enemy)
+		end
 end
 
 function move(obj)
 	obj.x+=obj.spx
 	obj.y+=obj.spy
+end
+
+function killenemy(enemy)
+	del(enemies,enemy)
+	sfx(2)
+	score+=1
+	explode(enemy.x+4,enemy.y+4)
+	
+	if enemy.behavior=="attack" then
+		if rnd()<0.5 then
+			pick_attack()
+		end
+	end
+end
+
+function animate(enemy)
+	enemy.animframe+=enemy.animsp
+	if flr(enemy.animframe)>#enemy.anim then
+		enemy.animframe=1
+	end
+
+	enemy.spr=enemy.anim[flr(enemy.animframe)]
+end
+
+
+-->8
+--bullets
+
+function fire(enemy) 
+		local enembull=makespr()
+		enembull.spr=32
+		enembull.x=enemy.x+3
+		enembull.y=enemy.y+6
+		enembull.anim={32,33,34,32}
+		enembull.animsp=0.5
+		enembull.spy=2
+		
+		enembull.colw=2
+		enembull.colh=2
+		enembull.bulmode=true
+		
+		enemy.flash=4
+		add(enembullets,enembull)
+		sfx(29)
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
@@ -864,12 +955,12 @@ __gfx__
 09aaaa90000000000000000000000000000000000037730000377300003773000037730000000000000000000000000000000000000000000000000000000000
 009aa900000000000000000000000000000000000303303003033030030330300303303000000000000000000000000000000000000000000000000000000000
 00099000000000000000000000000000000000000300003030000003030000300330033000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00ee000000ee00000077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0e22e0000e88e00007cc700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+e2e82e00e87e8e007c77c70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+e2882e00e8ee8e007c77c70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0e22e0000e88e00007cc700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00ee000000ee00000077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -997,6 +1088,7 @@ __sfx__
 010c00000175001750017500175001750017500175001750037500375003750037500375003750037500375006750067500675006750067500675006750067500575005750057500575005750057500575005750
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
 110400003e5723d5723b572385723457231572305622d5622b562285622556223562215621f5521e5521c5521b55218552165421454212532115220f5220e5220d5220c5120a5120851207512055120351202512
+000200001835202302123420932206322053220535200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302
 __music__
 04 04050644
 00 07084749
