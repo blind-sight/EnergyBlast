@@ -13,6 +13,7 @@ function _init()
 	
 	start_screen()
 	
+	shake=0
 	btnlockout=0
 	blinkt=0
 	t=0 --number of frames
@@ -38,6 +39,9 @@ end
 
 -- (soft 30 fps)
 function _draw()
+
+	shakescreen()
+	
 	if mode=="game" then
 		draw_game()
 	elseif mode=="start" then
@@ -60,7 +64,7 @@ function start_game()
 	score=0
 	muzzle=0
 	bulltimer=0
-	wave=0
+	wave=1
 	nextwave()
 	
 	ship=makespr()
@@ -147,6 +151,7 @@ function update_game()
 			if collision(enemy,ship) then			
 				explode(ship.x+4,ship.y+4,true)
 				ship.lives.curr-=1
+				shake=8
 				sfx(1)
 				ship.invul=60
 			end
@@ -161,6 +166,7 @@ function update_game()
 			if collision(enembull,ship) then			
 				explode(ship.x+4,ship.y+4,true)
 				ship.lives.curr-=1
+				shake=8
 				sfx(1)
 				ship.invul=60
 			end
@@ -668,6 +674,23 @@ function del_outside_screen(obj,array)
 		del(array,obj)
 	end
 end
+
+function shakescreen()
+	--minus (shake/2) to get only positive values
+	local shakex=rnd(shake)-(shake/2)
+	local shakey=rnd(shake)-(shake/2)
+	
+	camera(shakex,shakey)
+	
+	if shake>10 then
+		shake*=0.9
+	else
+		shake-=1
+		if shake<1 then
+			shake=0
+		end
+	end
+end
 -->8
 --waves and enemies
 
@@ -838,7 +861,7 @@ function execute_behavior(enemy)
 				enemy.spy=1
 			else
 				if t%20==0 then
-					firespread(enemy,8,1,
+					firespread(enemy,8,1.3,
 						time()/16)
 				end
 			end
@@ -891,7 +914,13 @@ function pick_fire()
 		if enemy==nil then return end
 		
 		if enemy.behavior=="hover" then
-			fire(enemy,0,2)
+			if enemy.type==4 then
+				firespread(enemy,8,1.3,rnd())
+			elseif enemy.type==2 then
+				aimedfire(enemy,2)
+			else
+				fire(enemy,0,2)
+			end
 		end
 end
 
@@ -950,6 +979,8 @@ function fire(enemy,ang,spd)
 		enemy.flash=4
 		add(enembullets,enembull)
 		sfx(29)
+		
+		return enembull
 end
 
 function firespread(enemy,num,
@@ -962,6 +993,17 @@ function firespread(enemy,num,
 		for i=1,num do
 			fire(enemy,1/num*i+baseang,spd)
 		end
+end
+
+function aimedfire(enemy,spd)
+	local enemybull=fire(enemy,0,spd)
+	
+	--angle between two points
+	local ang=atan2((ship.y+4)-enemybull.y,
+		(ship.x+4)-enemybull.x)
+	
+	enemybull.spx=sin(ang)*spd
+	enemybull.spy=cos(ang)*spd
 end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
