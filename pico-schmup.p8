@@ -62,9 +62,11 @@ end
 
 function start_game()
 	score=0
+	energy=0
 	muzzle=0
 	bulltimer=0
-	wave=1
+	wave=5
+	lastwave=9
 	nextwave()
 	
 	ship=makespr()
@@ -82,6 +84,7 @@ function start_game()
 	enemies={}
 	particles={}	
 	shockwaves={}
+	pickups={}
 	
 	attackfreq=60
 	nextfire=0
@@ -106,6 +109,13 @@ function update_game()
 		move(bull)
 		
 		del_outside_screen(bull,bullets)
+	end
+	
+	--moving pickups
+	for pickup in all (pickups) do
+		move(pickup)
+		
+		del_outside_screen(pickup,pickups)
 	end
 	
 	--move enemy bullets
@@ -158,6 +168,16 @@ function update_game()
 		end
 	else 
 		ship.invul-=1
+	end
+	
+	--collision ship x pickups
+	for pickup in all(pickups) do
+		if collision(pickup,ship) then			
+			del(pickups,pickup)
+			energy+=1
+			sfx(30)
+			shockwave(pickup.x,pickup.y,false)
+		end
 	end
 	
 	--collision ship x enemy bullets
@@ -337,6 +357,21 @@ function draw_game()
 		drawspr(bull)
 	end
 	
+	--pickups
+	for pickup in all(pickups) do
+		local col=7
+		if t%4<2 then
+			col=14
+		end
+		
+		for i=1,15 do
+			pal(i,col)
+		end
+		draw_outline(pickup)
+		pal()
+		drawspr(pickup)
+	end
+	
 	--enemies
 	for enemy in all(enemies) do
 		if enemy.flash>0 then
@@ -400,9 +435,7 @@ function draw_game()
 	for enembull in all(enembullets) do
 		drawspr(enembull)
 	end
-	
-	print("score: "..score, 40,1,12)
-	
+		
 	for i=1,ship.lives.max do 
 		if ship.lives.curr>=i then
 			spr(heartspr,i*9,1)
@@ -410,6 +443,11 @@ function draw_game()
 			spr(emptyheartspr,i*9,1)
 		end
 	end
+	
+	print("score: "..score, 40,1,12)
+	spr(48,110,0)
+	print(energy,120,1,14)
+	
 end
 
 function draw_start()
@@ -500,6 +538,17 @@ function drawspr(obj)
 	
 	spr(obj.spr,sprx,spry,
 			obj.sprw,obj.sprh)
+end
+
+function draw_outline(obj)
+	spr(obj.spr,obj.x+1,obj.y,
+		obj.sprw,obj.sprh)
+	spr(obj.spr,obj.x-1,obj.y,
+		obj.sprw,obj.sprh)
+	spr(obj.spr,obj.x,obj.y+1,
+		obj.sprw,obj.sprh)
+	spr(obj.spr,obj.x,obj.y-1,
+		obj.sprw,obj.sprh)
 end
 
 function collision(a,b)
@@ -698,38 +747,87 @@ function spawnwave()
 	sfx(28)
 	
 	if wave==1 then
-		attackfreq=60
-		placeenemies({
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1},
-			{1,1,1,1,1,1,1,1,1,1}
-		})
-	elseif wave==2 then
-		attackfreq=60
-		placeenemies({
-			{1,1,1,2,2,2,2,1,1,1},
-			{1,1,1,2,2,2,2,1,1,1},
-			{1,1,1,2,2,2,2,1,1,1},
-			{1,1,2,2,2,2,2,2,1,1}
-		})
-	elseif wave==3 then
-		attackfreq=60
-		placeenemies({
-			{3,3,0,2,2,2,2,0,3,3},
-			{3,3,0,2,2,2,2,0,3,3},
-			{3,3,0,1,1,1,1,0,3,3},
-			{3,3,0,1,0,0,1,0,3,3}
-		})
-	elseif wave==4 then
-		attackfreq=60
-		placeenemies({
-			{0,0,0,0,0,0,0,0,0,0},
-			{0,0,0,4,0,0,0,0,0,0},
-			{0,0,0,0,0,0,0,0,0,0},
-			{0,0,0,0,0,0,0,0,0,0}
-		})
-	end
+  --space invaders
+  attacfreq=60
+  placeenemies({
+   {0,1,1,1,1,1,1,1,1,0},
+   {0,1,1,1,1,1,1,1,1,0},
+   {0,1,1,1,1,1,1,1,1,0},
+   {0,1,1,1,1,1,1,1,1,0}
+  })
+ elseif wave==2 then
+  --red tutorial
+  attacfreq=60
+  placeenemies({
+   {1,1,2,2,1,1,2,2,1,1},
+   {1,1,2,2,1,1,2,2,1,1},
+   {1,1,2,2,2,2,2,2,1,1},
+   {1,1,2,2,2,2,2,2,1,1}
+  })
+ elseif wave==3 then
+  --wall of red
+  attacfreq=60
+  placeenemies({
+   {1,1,2,2,1,1,2,2,1,1},
+   {1,1,2,2,2,2,2,2,1,1},
+   {2,2,2,2,2,2,2,2,2,2},
+   {2,2,2,2,2,2,2,2,2,2}
+  })
+ elseif wave==4 then
+  --spin tutorial
+  attacfreq=60
+  placeenemies({
+   {3,3,0,1,1,1,1,0,3,3},
+   {3,3,0,1,1,1,1,0,3,3},
+   {3,3,0,1,1,1,1,0,3,3},
+   {3,3,0,1,1,1,1,0,3,3}
+  })
+ elseif wave==5 then
+  --chess
+  attacfreq=60
+  placeenemies({
+   {3,1,3,1,2,2,1,3,1,3},
+   {1,3,1,2,1,1,2,1,3,1},
+   {3,1,3,1,2,2,1,3,1,3},
+   {1,3,1,2,1,1,2,1,3,1}
+  })
+ elseif wave==6 then
+  --yellow tutorial
+  attacfreq=60
+  placeenemies({
+   {1,1,1,0,4,0,0,1,1,1},
+   {1,1,0,0,0,0,0,0,1,1},
+   {1,1,0,1,1,1,1,0,1,1},
+   {1,1,0,1,1,1,1,0,1,1}
+  })
+ elseif wave==7 then
+  --double yellow
+  attacfreq=60
+  placeenemies({
+   {3,3,0,1,1,1,1,0,3,3},
+   {4,0,0,2,2,2,2,0,4,0},
+   {0,0,0,2,1,1,2,0,0,0},
+   {1,1,0,1,1,1,1,0,1,1}
+  })
+ elseif wave==8 then
+  --hell
+  attacfreq=60
+  placeenemies({
+   {0,0,1,1,1,1,1,1,0,0},
+   {3,3,1,1,1,1,1,1,3,3},
+   {3,3,2,2,2,2,2,2,3,3},
+   {3,3,2,2,2,2,2,2,3,3}
+  })
+ elseif wave==9 then
+  --boss
+  attacfreq=60
+  placeenemies({
+   {0,0,0,0,0,0,0,0,0,0},
+   {0,0,0,0,4,0,0,0,0,0},
+   {0,0,0,0,0,0,0,0,0,0},
+   {0,0,0,0,0,0,0,0,0,0}
+  })
+ end  
 end
 
 function placeenemies(lvl)
@@ -747,7 +845,7 @@ end
 function nextwave()
 	wave+=1
 	
-	if wave>4 then
+	if wave>lastwave then
 		mode="win"
 		btnlockout=t+30
 		music(4)
@@ -780,15 +878,15 @@ function spawnenemy(type,x,y,w)
 		enemy.anim={21,22,23,24}
 	elseif type==2 then
 		enemy.spr=148
-		enemy.hp=5
+		enemy.hp=2
 		enemy.anim={148,149}
 	elseif type==3 then
 		enemy.spr=184
-		enemy.hp=5
+		enemy.hp=4
 		enemy.anim={184,185,186,187}
 	elseif type==4 then
 		enemy.spr=208
-		enemy.hp=5
+		enemy.hp=20
 		enemy.sprw=2
 		enemy.sprh=2
 		enemy.anim={208,210}
@@ -905,23 +1003,34 @@ function pick_attack()
 end
 
 function pick_fire()
-			--select bottom row enemies
-		local maxnum=min(10,#enemies)
-		local index=flr(rnd(maxnum))	
-		index=#enemies-index
-		
-		local enemy=enemies[index]
-		if enemy==nil then return end
-		
-		if enemy.behavior=="hover" then
-			if enemy.type==4 then
-				firespread(enemy,8,1.3,rnd())
-			elseif enemy.type==2 then
-				aimedfire(enemy,2)
-			else
-				fire(enemy,0,2)
+	--select bottom row enemies
+	local maxnum=min(10,#enemies)
+	local index=flr(rnd(maxnum))
+	
+	for enemy in all(enemies) do
+		if enemy.type==4 and 
+			enemy.behaviour=="hover" then
+			if rnd()<0.5 then
+				firespread(enemy,12,1.3,rnd())
+				return
 			end
 		end
+	end
+		
+	index=#enemies-index
+	
+	local enemy=enemies[index]
+	if enemy==nil then return end
+	
+	if enemy.behavior=="hover" then
+		if enemy.type==4 then
+			firespread(enemy,12,1.3,rnd())
+		elseif enemy.type==2 then
+			aimedfire(enemy,2)
+		else
+			fire(enemy,0,2)
+		end
+	end
 end
 
 function move(obj)
@@ -935,11 +1044,24 @@ function killenemy(enemy)
 	score+=1
 	explode(enemy.x+4,enemy.y+4)
 	
+	if rnd()<0.1 then
+		drop_pickup(enemy.x,enemy.y)	
+	end
+	
 	if enemy.behavior=="attack" then
 		if rnd()<0.5 then
 			pick_attack()
 		end
 	end
+end
+
+function drop_pickup(x,y)
+	local pickup=makespr()
+	pickup.x=x
+	pickup.y=y
+	pickup.spy=0.5
+	pickup.spr=48
+	add(pickups,pickup)
 end
 
 function animate(enemy)
@@ -1030,14 +1152,14 @@ e2882e00e8ee8e007c77c70000000000000000000000000000000000000000000000000000000000
 00ee000000ee00000077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00079000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00779900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07779990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+77779999000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+99994444000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+09994440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00994400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1156,6 +1278,7 @@ __sfx__
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
 110400003e5723d5723b572385723457231572305622d5622b562285622556223562215621f5521e5521c5521b55218552165421454212532115220f5220e5220d5220c5120a5120851207512055120351202512
 000200001835202302123420932206322053220535200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302
+11020000095520a5520b5620c5620e5421253216522145221a5221a5221d5120950201502005021d5020a50200502105020050200002000020000200002000020000200002000020000200002000020000200002
 __music__
 04 04050644
 00 07084749
