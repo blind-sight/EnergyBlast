@@ -40,7 +40,7 @@ end
 -- (soft 30 fps)
 function _draw()
 
-	shakescreen()
+	shake_screen()
 	
 	if mode=="game" then
 		draw_game()
@@ -62,20 +62,20 @@ end
 
 function start_game()
 	score=0
-	energy=0
+	energy=9
 	muzzle=0
 	bulltimer=0
 	wave=5
 	lastwave=9
-	nextwave()
+	next_wave()
 	
-	ship=makespr()
+	ship=make_spr()
 	ship.x=64
 	ship.y=64
 	ship.spr=2
 	ship.spx=0
 	ship.spy=0
-	ship.lives={max=3,curr=1}
+	ship.lives={max=4,curr=3}
 	ship.invul=0 --invulnerability
 	
 	stars={}	
@@ -85,6 +85,7 @@ function start_game()
 	particles={}	
 	shockwaves={}
 	pickups={}
+	floats={} --floating elements
 	
 	attackfreq=60
 	nextfire=0
@@ -144,12 +145,12 @@ function update_game()
 				del(bullets,bull)
 				shockwave(bull.x,bull.y,false)
 				spark(bull.x+4,bull.y+4,false)
-				enemy.hp-=1
+				enemy.hp-=bull.dmg
 				sfx(3)
 				enemy.flash=2
 				
 				if enemy.hp<=0 then
-					killenemy(enemy)
+					kill_enemy(enemy)
 				end
 			end
 		end
@@ -173,10 +174,8 @@ function update_game()
 	--collision ship x pickups
 	for pickup in all(pickups) do
 		if collision(pickup,ship) then			
+			decide_pickup(pickup)
 			del(pickups,pickup)
-			energy+=1
-			sfx(30)
-			shockwave(pickup.x,pickup.y,false)
 		end
 	end
 	
@@ -200,7 +199,7 @@ function update_game()
 		return
 	end
 	
-	picktimer()
+	pick_timer()
 	
 	--animate flame
 	flamespr=flamespr+1
@@ -215,15 +214,15 @@ function update_game()
 	
 	--check if waves is over
 	if mode=="game" and #enemies==0 then
-		nextwave()
+		next_wave()
 	end
 	
 	--checking edges
 	if ship.x>120 then
-		ship.x=0
+		ship.x=120
 		sfx(0)
 	elseif ship.x<0 then
-		ship.x=120
+		ship.x=0
 		sfx(0)
 	end
 	if ship.y<0 then
@@ -284,7 +283,7 @@ function update_wavetext()
 	wavetime-=1
 	if wavetime<=0 then
 		mode="game"
-		spawnwave()
+		spawn_wave()
 	end
 end
 
@@ -307,16 +306,26 @@ function handle_ship_controls()
 		ship.spy=2
 	end
 	
+	if btnp(4) then
+		if energy>0 then
+			energybomb(energy)
+			energy=0
+		else
+			sfx(32)
+		end
+	end
+	
 	-- need to press btn
 	-- each time to fire
 	if btn(5) then
 		if bulltimer<=0 then
-			local bullet=makespr()
+			local bullet=make_spr()
 			bullet.x=ship.x+1
 			bullet.y=ship.y-3
 			bullet.spr=16
 			bullet.colw=6
 			bullet.spy=-4
+			bullet.dmg=1
 			
 			add(bullets,bullet)
 			sfx(1)
@@ -341,12 +350,12 @@ function draw_game()
 	--ship
 	if ship.lives.curr>0 then
 		if ship.invul<=0 then
-			drawspr(ship)
+			draw_spr(ship)
 			spr(flamespr,ship.x,ship.y+8)	
 		else
 			--invul state
 			if sin(t/5)<0.1 then
-				drawspr(ship)
+				draw_spr(ship)
 				spr(flamespr,ship.x,ship.y+8)
 			end
 		end
@@ -354,7 +363,7 @@ function draw_game()
 	
 	--bullets
 	for bull in all(bullets) do
-		drawspr(bull)
+		draw_spr(bull)
 	end
 	
 	--pickups
@@ -369,17 +378,17 @@ function draw_game()
 		end
 		draw_outline(pickup)
 		pal()
-		drawspr(pickup)
+		draw_spr(pickup)
 	end
 	
 	--enemies
 	for enemy in all(enemies) do
 		if enemy.flash>0 then
 			enemy.flash-=1
-			replacecolors(7)
+			replace_colors(7)
 		end
 		
-		drawspr(enemy)
+		draw_spr(enemy)
 		pal() --reset color
 	end
 	
@@ -433,7 +442,7 @@ function draw_game()
 	
 	--enemy bullets
 	for enembull in all(enembullets) do
-		drawspr(enembull)
+		draw_spr(enembull)
 	end
 		
 	for i=1,ship.lives.max do 
@@ -444,38 +453,53 @@ function draw_game()
 		end
 	end
 	
-	print("score: "..score, 40,1,12)
+	--floats
+	for float in all(floats) do
+		local col=7
+		if t%4<2 then
+			col=8
+		end
+		cprint(float.txt,float.x,
+			float.y,col)
+		float.y-=0.5
+		float.age+=1
+		if float.age>60 then
+			del(floats,float)
+		end
+	end
+	
+	print("score: "..score,50,1,12)
 	spr(48,110,0)
 	print(energy,120,1,14)
-	
+		
 end
 
 function draw_start()
 	cls(1)
-	centertext("pico schmup",40,12)
-	centertext("press any key to start",
-		80,blink())
+	cprint("pico schmup",64,40,12)
+	cprint("press any key to start",
+		64,80,blink())
 end
 
 function draw_over()
 	draw_game()
-	centertext("game over",40,8)
-	centertext("press any key to continue",
-		80,blink())
+	cprint("game over",64,40,8)
+	cprint("press any key to continue",
+		64,80,blink())
 end
 
 function draw_win()
 	draw_game()
-	centertext("congratulations",
-		40,2)
-	centertext("press any key to continue",
-		80,blink())
+	cprint("congratulations",
+		64,40,2)
+	cprint("press any key to continue",
+		64,80,blink())
 end
 
 function draw_wavetext()
 	draw_game()
-	centertext("wave "..wave,
-		40,blink())
+	cprint("wave "..wave,
+		64,40,blink())
 end
 
 function draw_starfield()	
@@ -503,8 +527,9 @@ end
 -->8
 --tools
 
-function centertext(s,h,col)
-	print(s,64-#s*2,h,col)
+--centered horizontally text
+function cprint(txt,x,y,col)
+	print(txt,x-#txt*2,y,col)
 end
 
 function blink()
@@ -518,7 +543,7 @@ function blink()
 	return blinkanim[blinkt]
 end
 
-function drawspr(obj)
+function draw_spr(obj)
 	local sprx=obj.x
 	local spry=obj.y
 	
@@ -570,7 +595,7 @@ function collision(a,b)
 	return true
 end
 
-function replacecolors(color)
+function replace_colors(color)
 	for i=1,15 do
 			pal(i,color)
 	end
@@ -692,7 +717,7 @@ function spark(x,y,isbig)
 	end
 end
 
-function makespr()
+function make_spr()
 	local spr={
 		x=0,
 		y=0,
@@ -724,7 +749,7 @@ function del_outside_screen(obj,array)
 	end
 end
 
-function shakescreen()
+function shake_screen()
 	--minus (shake/2) to get only positive values
 	local shakex=rnd(shake)-(shake/2)
 	local shakey=rnd(shake)-(shake/2)
@@ -740,16 +765,26 @@ function shakescreen()
 		end
 	end
 end
+
+function pop_float(txt,x,y)
+	local float={
+		x=x,
+		y=y,
+		txt=txt,
+		age=0
+	}
+	add(floats,float)
+end
 -->8
 --waves and enemies
 
-function spawnwave() 
+function spawn_wave() 
 	sfx(28)
 	
 	if wave==1 then
   --space invaders
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {0,1,1,1,1,1,1,1,1,0},
    {0,1,1,1,1,1,1,1,1,0},
    {0,1,1,1,1,1,1,1,1,0},
@@ -758,7 +793,7 @@ function spawnwave()
  elseif wave==2 then
   --red tutorial
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {1,1,2,2,1,1,2,2,1,1},
    {1,1,2,2,1,1,2,2,1,1},
    {1,1,2,2,2,2,2,2,1,1},
@@ -767,7 +802,7 @@ function spawnwave()
  elseif wave==3 then
   --wall of red
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {1,1,2,2,1,1,2,2,1,1},
    {1,1,2,2,2,2,2,2,1,1},
    {2,2,2,2,2,2,2,2,2,2},
@@ -776,7 +811,7 @@ function spawnwave()
  elseif wave==4 then
   --spin tutorial
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {3,3,0,1,1,1,1,0,3,3},
    {3,3,0,1,1,1,1,0,3,3},
    {3,3,0,1,1,1,1,0,3,3},
@@ -785,7 +820,7 @@ function spawnwave()
  elseif wave==5 then
   --chess
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {3,1,3,1,2,2,1,3,1,3},
    {1,3,1,2,1,1,2,1,3,1},
    {3,1,3,1,2,2,1,3,1,3},
@@ -794,7 +829,7 @@ function spawnwave()
  elseif wave==6 then
   --yellow tutorial
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {1,1,1,0,4,0,0,1,1,1},
    {1,1,0,0,0,0,0,0,1,1},
    {1,1,0,1,1,1,1,0,1,1},
@@ -803,7 +838,7 @@ function spawnwave()
  elseif wave==7 then
   --double yellow
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {3,3,0,1,1,1,1,0,3,3},
    {4,0,0,2,2,2,2,0,4,0},
    {0,0,0,2,1,1,2,0,0,0},
@@ -812,7 +847,7 @@ function spawnwave()
  elseif wave==8 then
   --hell
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {0,0,1,1,1,1,1,1,0,0},
    {3,3,1,1,1,1,1,1,3,3},
    {3,3,2,2,2,2,2,2,3,3},
@@ -821,7 +856,7 @@ function spawnwave()
  elseif wave==9 then
   --boss
   attacfreq=60
-  placeenemies({
+  place_enemies({
    {0,0,0,0,0,0,0,0,0,0},
    {0,0,0,0,4,0,0,0,0,0},
    {0,0,0,0,0,0,0,0,0,0},
@@ -830,19 +865,19 @@ function spawnwave()
  end  
 end
 
-function placeenemies(lvl)
+function place_enemies(lvl)
 	for y=1,4 do
 		local line=lvl[y]
 		for x=1,10 do 
 			if line[x]!=0 then
-				spawnenemy(line[x],
+				spawn_enemy(line[x],
 					x*12-6,4+y*12,x*3)
 			end
 		end
 	end
 end
 
-function nextwave()
+function next_wave()
 	wave+=1
 	
 	if wave>lastwave then
@@ -861,8 +896,8 @@ function nextwave()
 	end
 end
 
-function spawnenemy(type,x,y,w)
-	local enemy=makespr()
+function spawn_enemy(type,x,y,w)
+	local enemy=make_spr()
 	enemy.posx=x --intended pos
 	enemy.posy=y
 	enemy.behavior="flyin"
@@ -970,7 +1005,7 @@ function execute_behavior(enemy)
 
 end
 
-function picktimer()
+function pick_timer()
 	if mode!="game" then
 		return
 	end
@@ -1038,30 +1073,57 @@ function move(obj)
 	obj.y+=obj.spy
 end
 
-function killenemy(enemy)
+function kill_enemy(enemy)
 	del(enemies,enemy)
 	sfx(2)
 	score+=1
 	explode(enemy.x+4,enemy.y+4)
 	
-	if rnd()<0.1 then
-		drop_pickup(enemy.x,enemy.y)	
-	end
+	local diamondchance=0.1
 	
 	if enemy.behavior=="attack" then
 		if rnd()<0.5 then
 			pick_attack()
 		end
+		diamondchance=0.2
+		pop_float("100",enemy.x+4,enemy.y+4)
 	end
+	
+	if rnd()<diamondchance then
+		drop_pickup(enemy.x,enemy.y)	
+	end
+	
 end
 
 function drop_pickup(x,y)
-	local pickup=makespr()
+	local pickup=make_spr()
 	pickup.x=x
 	pickup.y=y
-	pickup.spy=0.5
+	pickup.spy=0.75
 	pickup.spr=48
 	add(pickups,pickup)
+end
+
+function decide_pickup(pickup)
+	energy+=1
+	shockwave(pickup.x,pickup.y,false)
+	
+	if energy>=10 then
+		if ship.lives.curr<ship.lives.max then
+			ship.lives.curr+=1
+			sfx(31)
+			energy=0
+			pop_float("1up!",pickup.x,
+				pickup.y)
+		else
+			pop_float("10",pickup.x,
+				pickup.y)
+			score+=10
+			energy=0
+		end
+	else
+		sfx(30)
+	end
 end
 
 function animate(enemy)
@@ -1078,7 +1140,7 @@ end
 --bullets
 
 function fire(enemy,ang,spd) 
-		local enembull=makespr()
+		local enembull=make_spr()
 		enembull.spr=32
 		enembull.x=enemy.x+3
 		enembull.y=enemy.y+6
@@ -1127,6 +1189,27 @@ function aimedfire(enemy,spd)
 	enemybull.spx=sin(ang)*spd
 	enemybull.spy=cos(ang)*spd
 end
+
+function energybomb(energy)
+	local spacing=0.25/(energy*2)
+	for i=0,energy*2 do
+		local ang=0.375+spacing*i
+		local bullet=make_spr()
+		bullet.x=ship.x
+		bullet.y=ship.y-3
+		bullet.spr=17
+		bullet.spx=sin(ang)*4
+		bullet.spy=cos(ang)*4
+		bullet.dmg=3
+		add(bullets,bullet)
+	end
+	
+	shockwave(ship.x+3,ship.y+3,true)
+	muzzle=5
+	shake=5
+	sfx(33)
+	ship.invul=30
+end
 __gfx__
 00000000000330000003300000033000000000000000000000000000000000000000000000000000000000000000000008800880088008800000000000000000
 000000000036630000366300003663000000000000077000000770000007700000c77c0000077000000000000000000088888888800880080000000000000000
@@ -1136,14 +1219,14 @@ __gfx__
 007007000311bb303bb11bb303bb1130000000000000000000011000000000000000000000000000000000000000000000888800008008000000000000000000
 00000000035563303b6556b303365530000000000000000000000000000000000000000000000000000000000000000000088000000880000000000000000000
 00000000006996000369963000699600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00999900000000000000000000000000000000000330033003300330033003300330033000000000000000000000000000000000000000000000000000000000
-099779900000000000000000000000000000000033b33b3333b33b3333b33b3333b33b3300000000000000000000000000000000000000000000000000000000
-09a77a90000000000000000000000000000000003bbbbbb33bbbbbb33bbbbbb33bbbbbb300000000000000000000000000000000000000000000000000000000
-09a77a90000000000000000000000000000000003b7717b33b7717b33b7717b33b7717b300000000000000000000000000000000000000000000000000000000
-09a77a90000000000000000000000000000000000b7117b00b7117b00b7117b00b7117b000000000000000000000000000000000000000000000000000000000
-09aaaa90000000000000000000000000000000000037730000377300003773000037730000000000000000000000000000000000000000000000000000000000
-009aa900000000000000000000000000000000000303303003033030030330300303303000000000000000000000000000000000000000000000000000000000
-00099000000000000000000000000000000000000300003030000003030000300330033000000000000000000000000000000000000000000000000000000000
+00999900009999000000000000000000000000000330033003300330033003300330033000000000000000000000000000000000000000000000000000000000
+0997799009aaaa9000000000000000000000000033b33b3333b33b3333b33b3333b33b3300000000000000000000000000000000000000000000000000000000
+09a77a909aa77aa90000000000000000000000003bbbbbb33bbbbbb33bbbbbb33bbbbbb300000000000000000000000000000000000000000000000000000000
+09a77a909a7777a90000000000000000000000003b7717b33b7717b33b7717b33b7717b300000000000000000000000000000000000000000000000000000000
+09a77a909a7777a90000000000000000000000000b7117b00b7117b00b7117b00b7117b000000000000000000000000000000000000000000000000000000000
+09aaaa909aa77aa90000000000000000000000000037730000377300003773000037730000000000000000000000000000000000000000000000000000000000
+009aa90009aaaa900000000000000000000000000303303003033030030330300303303000000000000000000000000000000000000000000000000000000000
+00099000009999000000000000000000000000000300003030000003030000300330033000000000000000000000000000000000000000000000000000000000
 00ee000000ee00000077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0e22e0000e88e00007cc700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 e2e82e00e87e8e007c77c70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1278,7 +1361,10 @@ __sfx__
 010c00001d55024500245001b55519555245001e550245002450029500165502450024500245001e550245001e55024500245001d5551b555245001d5502450024500295001855024500275002a5002950028500
 110400003e5723d5723b572385723457231572305622d5622b562285622556223562215621f5521e5521c5521b55218552165421454212532115220f5220e5220d5220c5120a5120851207512055120351202512
 000200001835202302123420932206322053220535200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302003020030200302
-11020000095520a5520b5620c5620e5421253216522145221a5221a5221d5120950201502005021d5020a50200502105020050200002000020000200002000020000200002000020000200002000020000200002
+10020000095520a5520b5620c5620e5421253216522145221a5221a5221d5120950201502005021d5020a50200502105020050200002000020000200002000020000200002000020000200002000020000200002
+00090000050560a0660f076150761906621056240472a03734037340373b0373f0573500700007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000400000744007420074200040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
+4a0200002b6512e661306613166133661346612f6612e6612d6612d6612d6712866125651226511f6511e6511d641146411a641106410b6411064114641066310562104621036310262101621016210061100611
 __music__
 04 04050644
 00 07084749
