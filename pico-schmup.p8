@@ -5,7 +5,9 @@ __lua__
 
 function _init()
 	cls(0)
-	cartdata("schmup")
+	cartdata("shmup")
+	
+	version="v1"
 	
 	--sprites
 	flamespr=5
@@ -22,6 +24,8 @@ function _init()
 	t=0 --number of frames
 	
 	debug=""
+	
+	peekerx=64
 end
 
 -- (gameplay hard 30fps)
@@ -65,6 +69,7 @@ end
 
 function start_screen()
 	mode="start"
+	create_stars()
 	music(7)
 end
 
@@ -86,7 +91,6 @@ function start_game()
 	ship.lives={max=4,curr=4}
 	ship.invul=0 --invulnerability
 	
-	stars={}	
 	bullets={}
 	enembullets={}
 	enemies={}
@@ -98,7 +102,10 @@ function start_game()
 	attackfreq=60
 	firefreq=20
 	nextfire=0
-			
+end
+
+function create_stars()
+	stars={}	
 	for i=1,100 do
 		local newstar={
 			x=flr(rnd(128)),
@@ -269,6 +276,8 @@ function ship_hit()
 end
 
 function update_start()
+	animate_starfield(0.4)	
+	
 	if btn(4)==false and btn(5)==false then
 		btnreleased=true
 	end
@@ -380,6 +389,28 @@ function handle_ship_controls()
 	ship.x+=ship.spx
 	ship.y+=ship.spy
 end
+
+function animate_starfield(spd)
+	if spd==nil then
+		spd=1
+	end
+
+	for star in all(stars) do		
+		star.y+=star.spd*spd
+		if star.y>128 then
+			star.y-=128
+		end	
+	end
+end
+
+function animate_hyperspace()
+	for star in all(stars) do		
+		star.y+=star.spd*7
+		if star.y>128 then
+			star.y-=128
+		end	
+	end
+end
 -->8
 --draw
 
@@ -390,8 +421,14 @@ function draw_game()
 	else
 		cls(0)
 	end
-	draw_starfield()
-	animate_starfield()
+	
+	if mode=="wavetext" then
+		animate_starfield(6)
+		draw_hyperspace()
+	else
+		draw_starfield()
+		animate_starfield()
+	end
 	
 	--ship
 	if ship.lives.curr>0 then
@@ -538,12 +575,25 @@ function make_score(val)
 end
 
 function draw_start()
-	cls(1)
-	cprint("pico schmup",64,45,12)
+	cls(0)
+	draw_starfield()
+	print(version,1,1,1)
+		
+	local sinval=sin(time()/3.5)
+	spr(21,peekerx,28+sinval*4)
+
+	if sinval>-0.5 then
+		peekerx=30+rnd(60)
+	end
+		
+	spr(212,16,30,12,2)
+	cprint("short shwave shmup",
+		64,45,6)
+
 	if highscore>0 then
 		cprint("high score:",64,63,12)
 		cprint(make_score(highscore),
-			64,69,12)
+			64,68,12)
 	end
 
 	cprint("press any key to start",
@@ -604,12 +654,18 @@ function draw_starfield()
 	end
 end
 
-function animate_starfield()
+function draw_hyperspace()	
 	for star in all(stars) do		
-		star.y+=star.spd
-		if star.y>128 then
-			star.y-=128
-		end	
+		local starcol=6
+
+		if star.spd<1 then
+			starcol=1
+		elseif star.spd<1.5 then
+			starcol=13
+		end
+		
+		line(star.x,star.y,
+			star.x,star.y-6,starcol)
 	end
 end
 -->8
@@ -984,6 +1040,7 @@ end
 
 function next_wave()
 	wave+=1
+	animate_hyperspace()
 	
 	if wave>lastwave then
 		mode="win"
