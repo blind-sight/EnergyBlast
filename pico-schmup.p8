@@ -5,6 +5,7 @@ __lua__
 
 function _init()
 	cls(0)
+	cartdata("schmup")
 	
 	--sprites
 	flamespr=5
@@ -13,7 +14,9 @@ function _init()
 	
 	start_screen()
 	
+	highscore=dget(0)
 	shake=0
+	flash=0
 	btnlockout=0
 	blinkt=0
 	t=0 --number of frames
@@ -67,7 +70,7 @@ end
 
 function start_game()
 	score=0
-	energy=0
+	energy=9
 	muzzle=0
 	bulltimer=0
 	wave=0
@@ -75,8 +78,8 @@ function start_game()
 	next_wave()
 	
 	ship=make_spr()
-	ship.x=64
-	ship.y=64
+	ship.x=60
+	ship.y=90
 	ship.spr=2
 	ship.spx=0
 	ship.spy=0
@@ -93,8 +96,9 @@ function start_game()
 	floats={} --floating elements
 	
 	attackfreq=60
+	firefreq=20
 	nextfire=0
-		
+			
 	for i=1,100 do
 		local newstar={
 			x=flr(rnd(128)),
@@ -168,15 +172,26 @@ function update_game()
 		end
 	end
 	
+	--collision 
+	-- enemy bullets x bullets
+	for bull in all(bullets) do
+		--check if energy bullet
+		if bull.spr==17 then
+			for enembull in all(enembullets) do
+				if collision(enembull,bull) then
+					del(enembullets,enembull)
+					shockwave(enembull.x,enembull.y,false)
+					score+=5
+				end
+			end
+		end
+	end
+	
 	--collision ship x enemies
 	if ship.invul==0 then
 		for enemy in all(enemies) do
 			if collision(enemy,ship) then			
-				explode(ship.x+4,ship.y+4,true)
-				ship.lives.curr-=1
-				shake=8
-				sfx(1)
-				ship.invul=60
+				ship_hit()
 			end
 		end
 	else 
@@ -195,11 +210,7 @@ function update_game()
 	if ship.invul==0 then
 		for enembull in all(enembullets) do
 			if collision(enembull,ship) then			
-				explode(ship.x+4,ship.y+4,true)
-				ship.lives.curr-=1
-				shake=8
-				sfx(1)
-				ship.invul=60
+				ship_hit()
 			end
 		end
 	end
@@ -226,6 +237,7 @@ function update_game()
 	
 	--check if waves is over
 	if mode=="game" and #enemies==0 then
+		enembullets={}
 		next_wave()
 	end
 	
@@ -245,6 +257,15 @@ function update_game()
 		ship.y=120
 		sfx(0)
 	end
+end
+
+function ship_hit()
+	explode(ship.x+4,ship.y+4,true)
+	ship.lives.curr-=1
+	shake=8
+	flash=3
+	sfx(1)
+	ship.invul=60
 end
 
 function update_start()
@@ -267,6 +288,10 @@ function update_over()
 
 	if btnreleased then
 		if btnp(4) or btnp(5) then
+			if score>highscore then
+				highscore=score
+				dset(0,score)
+			end
 			start_screen()
 			btnreleased=false
 		end
@@ -284,6 +309,10 @@ function update_win()
 
 	if btnreleased then
 		if btnp(4) or btnp(5) then
+			if score>highscore then
+				highscore=score
+				dset(0,score)
+			end
 			start_screen()
 			btnreleased=false
 		end
@@ -320,7 +349,7 @@ function handle_ship_controls()
 	
 	if btnp(4) then
 		if energy>0 then
-			energybomb(energy)
+			energybomb()
 			energy=0
 		else
 			sfx(32)
@@ -355,7 +384,12 @@ end
 --draw
 
 function draw_game()
-	cls(0)
+	if flash>0 then
+		flash-=1
+		cls(2)
+	else
+		cls(0)
+	end
 	draw_starfield()
 	animate_starfield()
 	
@@ -489,38 +523,71 @@ function draw_game()
 		end
 	end
 	
-	print("score: "..score,50,1,12)
+	print("score: "..make_score(score),
+		50,2,12)
 	spr(48,110,0)
 	print(energy,120,1,14)
 		
 end
 
+function make_score(val)
+	if val==0 then
+		return "0"
+	end
+	return val.."00"
+end
+
 function draw_start()
 	cls(1)
-	cprint("pico schmup",64,40,12)
+	cprint("pico schmup",64,45,12)
+	if highscore>0 then
+		cprint("high score:",64,63,12)
+		cprint(make_score(highscore),
+			64,69,12)
+	end
+
 	cprint("press any key to start",
-		64,80,blink())
+		64,90,blink())
 end
 
 function draw_over()
 	draw_game()
 	cprint("game over",64,40,8)
-	cprint("press any key to continue",
-		64,80,blink())
+	draw_score_section()
 end
 
 function draw_win()
 	draw_game()
 	cprint("congratulations",
 		64,40,2)
-	cprint("press any key to continue",
-		64,80,blink())
+	draw_score_section()
 end
 
 function draw_wavetext()
 	draw_game()
-	cprint("wave "..wave,
-		64,40,blink())
+	if wave==lastwave then
+		cprint("final wave!"..wave .." of "
+		.. lastwave,64,40,blink())
+	else
+		cprint("wave "..wave .." of "
+		.. lastwave,64,40,blink())
+	end
+end
+
+function draw_score_section()
+	cprint("score: "..make_score(score),
+		64,60,12)
+	if score>highscore then
+		local col=7
+		if t%4<2 then
+			col=10
+		end
+		cprint("new highscore!",
+			64,66,col)
+	end
+	
+	cprint("press any key to continue",
+		64,90,blink())
 end
 
 function draw_starfield()	
@@ -813,6 +880,7 @@ function spawn_wave()
 	if wave==1 then
   --space invaders
   attacfreq=60
+  firefreq=20
   place_enemies({
    {0,1,1,1,1,1,1,1,1,0},
    {0,1,1,1,1,1,1,1,1,0},
@@ -822,6 +890,7 @@ function spawn_wave()
  elseif wave==2 then
   --red tutorial
   attacfreq=60
+  firefreq=20
   place_enemies({
    {1,1,2,2,1,1,2,2,1,1},
    {1,1,2,2,1,1,2,2,1,1},
@@ -830,7 +899,8 @@ function spawn_wave()
   })
  elseif wave==3 then
   --wall of red
-  attacfreq=60
+  attacfreq=50
+  firefreq=20
   place_enemies({
    {1,1,2,2,1,1,2,2,1,1},
    {1,1,2,2,2,2,2,2,1,1},
@@ -839,7 +909,8 @@ function spawn_wave()
   })
  elseif wave==4 then
   --spin tutorial
-  attacfreq=60
+  attacfreq=50
+  firefreq=30
   place_enemies({
    {3,3,0,1,1,1,1,0,3,3},
    {3,3,0,1,1,1,1,0,3,3},
@@ -848,7 +919,8 @@ function spawn_wave()
   })
  elseif wave==5 then
   --chess
-  attacfreq=60
+  attacfreq=50
+  firefreq=30
   place_enemies({
    {3,1,3,1,2,2,1,3,1,3},
    {1,3,1,2,1,1,2,1,3,1},
@@ -858,15 +930,17 @@ function spawn_wave()
  elseif wave==6 then
   --yellow tutorial
   attacfreq=60
+  firefreq=30
   place_enemies({
-   {1,1,1,0,4,0,0,1,1,1},
-   {1,1,0,0,0,0,0,0,1,1},
+   {2,2,2,0,4,0,0,2,2,2},
+   {2,2,0,0,0,0,0,0,2,2},
    {1,1,0,1,1,1,1,0,1,1},
    {1,1,0,1,1,1,1,0,1,1}
   })
  elseif wave==7 then
   --double yellow
-  attacfreq=60
+  attacfreq=70
+  firefreq=30
   place_enemies({
    {3,3,0,1,1,1,1,0,3,3},
    {4,0,0,2,2,2,2,0,4,0},
@@ -875,7 +949,8 @@ function spawn_wave()
   })
  elseif wave==8 then
   --hell
-  attacfreq=60
+  attacfreq=80
+  firefreq=30
   place_enemies({
    {0,0,1,1,1,1,1,1,0,0},
    {3,3,1,1,1,1,1,1,3,3},
@@ -885,6 +960,7 @@ function spawn_wave()
  elseif wave==9 then
   --boss
   attacfreq=60
+  firefreq=20
   place_enemies({
    {0,0,0,0,5,0,0,0,0,0},
    {0,0,0,0,0,0,0,0,0,0},
@@ -940,14 +1016,17 @@ function spawn_enemy(type,x,y,w)
 		enemy.spr=21
 		enemy.hp=3
 		enemy.anim={21,22,23,24}
+		enemy.score=1
 	elseif type==2 then
 		enemy.spr=148
 		enemy.hp=2
 		enemy.anim={148,149}
+		enemy.score=2
 	elseif type==3 then
 		enemy.spr=184
 		enemy.hp=4
 		enemy.anim={184,185,186,187}
+		enemy.score=3
 	elseif type==4 then
 		enemy.spr=208
 		enemy.hp=20
@@ -956,6 +1035,7 @@ function spawn_enemy(type,x,y,w)
 		enemy.anim={208,210}
 		enemy.colw=16
 		enemy.colh=16
+		enemy.score=5
 	elseif type==5 then
 		enemy.spr=68
 		enemy.hp=200
@@ -1087,7 +1167,7 @@ function pick_timer()
 	
 	if t>nextfire then
 		pick_fire()
-		nextfire=t+20+rnd(20)
+		nextfire=t+firefreq+rnd(firefreq)
 	end
 end
 
@@ -1151,23 +1231,32 @@ function kill_enemy(enemy)
 		enemy.phasebegin=t
 		enemy.isghost=true
 		enembullets={} --bullet cancelling
+		music(-1)
 		sfx(51)
 		return
 	end
 
 	del(enemies,enemy)
 	sfx(2)
-	score+=1
 	explode(enemy.x+4,enemy.y+4)
 	
 	local diamondchance=0.1
-	
+	local scoremulti=1
+
 	if enemy.behavior=="attack" then
 		if rnd()<0.5 then
 			pick_attack()
 		end
 		diamondchance=0.2
-		pop_float("100",enemy.x+4,enemy.y+4)
+		scoremulti=2
+	end
+	
+	local calcscore=enemy.score*scoremulti
+	score+=calcscore
+	
+	if scoremulti!=1 then
+		pop_float(make_score(calcscore),
+			enemy.x+4,enemy.y+4)
 	end
 	
 	if rnd()<diamondchance then
@@ -1197,9 +1286,10 @@ function decide_pickup(pickup)
 			pop_float("1up!",pickup.x,
 				pickup.y)
 		else
-			pop_float("10",pickup.x,
+			pop_float(make_score(50),pickup.x,
 				pickup.y)
-			score+=10
+			sfx(30)
+			score+=50
 			energy=0
 		end
 	else
@@ -1279,7 +1369,7 @@ function aimedfire(enemy,spd)
 	enemybull.spy=cos(ang)*spd
 end
 
-function energybomb(energy)
+function energybomb()
 	local spacing=0.25/(energy*2)
 	for i=0,energy*2 do
 		local ang=0.375+spacing*i
@@ -1296,6 +1386,7 @@ function energybomb(energy)
 	shockwave(ship.x+3,ship.y+3,true)
 	muzzle=5
 	shake=5
+	flash=3
 	sfx(33)
 	ship.invul=30
 end
@@ -1447,24 +1538,28 @@ function boss_phase_5(boss)
 	boss.shake=10
 	boss.flash=10
 	
-	if t%8==0 then
+	if t%8==0 then		
 		explode(boss.x+rnd(32),boss.y+rnd(24))
 		sfx(2)
 		shake=2
 	end
 	
 	--increase explosions at the end
-	if boss.phasebegin+2*30<t then
-		if t%5==0 then
+	if boss.phasebegin+3*30<t then
+		if t%4==2 then
 			explode(boss.x+rnd(32),boss.y+rnd(24))
 			sfx(2)
 			shake=2
 		end
 	end
 	
-	if boss.phasebegin+4*30<t then
+	if boss.phasebegin+6*30<t then
+		score+=100
+		pop_float(make_score(100),
+			enemy.x+16,enemy.y+12)
 		explode_boss(boss.x+16,boss.y+12)
 		shake=15
+		flash=3
 		sfx(35)
 		del(enemies,boss)
 	end
@@ -1638,14 +1733,14 @@ b063360b006336000063360000633600080550800805508008055080080550805d5245d505d24d50
 00000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 000100001e7301d7401d760127601177012770207701e7701d7701977019770187701777017770167701677016770197601b7601e760207502375024740247402373022730207301f7301e7301d7301b73017730
-0002000032520305202c52026520215201c5201852014520115200f5200c520095200852006520035200152000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0002000032520305202c5202952025520225201e5201b5201652012520105200d5200b52009520075200552004520035200251001510000000000000000000000000000000000000000000000000000000000000
 000100002c650346502f65027650216501b650156501365011650106500f6500b6500965008650056500365003650000000000000000000000000000000000000000000000000000000000000000000000000000
 0001000034750096502f530206200f620085200552002720007100060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00060000010501605019050160501905001050160501905016050190601b0611b0611b061290001d000170002600001050160501905016050190500105016050190501b0611b0611b0501b0501b0401b0301b025
 00060000205401d540205401d540205401d540205401d54022540225502255022550225500000000000000000000025534225302553022530255301d530255302253019531275322753027530275322753027530
 000600001972020720227201b730207301973020740227401b74020740227402274022740000000000000000000001672020720257201b730257301973025740227401b740277402274027740277402774027740
 001000001f5501f5501b5501d5501d550205501f5501f5501b5501a5501b5501d5501f5501f5501b5501d5501d550205501f5501b5501a5501b5501d5501f5502755027550255502355023550225502055020550
-001000000f5500f5500a5500f5501b530165501b5501b550165500f5500f5500a5500f5500f5500a550055500a5500e5500f5500f550165501b5501b550165501755017550125500f5500f550125501055010550
+011000000f5500f5500a5500f5501b530165501b5501b550165500f5500f5500a5500f5500f5500a550055500a5500e5500f5500f550165501b5501b550165501755017550125500f5500f550125501055010550
 001000001e5501c5501c550175501e5501b550205501d550225501e55023550205501c55026550265500000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0010000017550145501455010550175500b550195500d5501b5500f5501c550105500455016550165500000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 080d00001b0001b0001b0001d0001b0301b0001b0201d0201e0302003020040200401e0002000020000200001b7001d7001b7001b7001b7001d700227001a7001b7001b700167001b7001b7001b7001c7001c700
@@ -1690,7 +1785,7 @@ __sfx__
 5c030000131212513131151381711b1613b1513b1413c14116141291413913135131321312d13228132221321c13216132131321d1320e1320d1320a132091320813206122051220412203122031220312201120
 5c0400000817120161181610f17108171171711017109171071710d1610f161091510715106151051410514105132041320313202132021320113201132001320113201132011320112200122001220012200122
 __music__
-01 04050644
+00 04050644
 00 07084749
 04 090a484a
 04 0b0c0d44
