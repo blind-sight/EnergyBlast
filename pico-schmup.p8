@@ -51,6 +51,16 @@ function _init()
 	debug=""
 	
 	peekerx=64
+	
+	--highscrore
+ hs={}
+ hs1={} --first char of name
+ hs2={}
+ hs3={}
+ load_hs()
+ hschars={"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"} 
+	hs_x=128
+ hs_dx=128
 end
 
 -- (gameplay hard 30fps)
@@ -68,6 +78,8 @@ function _update()
 		update_over()
 	elseif mode=="win" then
 		update_win()
+	elseif mode=="highscore" then
+		update_highscore()
 	end
 end
 
@@ -80,12 +92,15 @@ function _draw()
 		draw_game()
 	elseif mode=="start" then
 		draw_start()
+		--draw_hs()
 	elseif mode=="wavetext" then
 		draw_wavetext()
 	elseif mode=="over" then
 		draw_over()
 	elseif mode=="win" then
 		draw_win()
+	elseif mode=="highscore" then
+		draw_highscore()
 	end
 	
 	camera()
@@ -322,8 +337,8 @@ function ship_hit()
 	ship.invul=60
 end
 
-function update_start()
-	animate_starfield(0.4)	
+function update_highscore()
+	animate_starfield()
 	
 	if btn(4)==false and btn(5)==false then
 		btnreleased=true
@@ -331,10 +346,35 @@ function update_start()
 
 	if btnreleased then
 		if btnp(4) or btnp(5) then
-			start_game()
+			start_screen()
 			btnreleased=false
 		end
 	end
+end
+
+function update_start()
+	animate_starfield(0.4)	
+	
+	if hs_x~=hs_dx then
+		ease_in(hs_x,hs_dx,5)
+	end
+	
+	if btn(4)==false and btn(5)==false then
+		btnreleased=true
+	end
+
+	if btnreleased then
+		if btnp(4) then
+			start_game()
+			btnreleased=false
+		elseif btnp(0) then
+			hs_dx=0
+		elseif btn(1) then
+			hs_dx=128
+		end
+	end
+	
+	debug=hs_dx
 end
 
 function update_over()
@@ -667,6 +707,10 @@ function make_score(val)
 	return val.."00"
 end
 
+function draw_hs()
+	print_hs(0)
+end
+
 function draw_start()
 	cls(0)
 	draw_starfield()
@@ -687,9 +731,11 @@ function draw_start()
 		cprint(make_score(highscore),
 			64,68,12)
 	end
-
+	
 	cprint("press any key to start",
 		64,90,blink(greyblink))
+		cls(0)
+		print_hs(hs_x)
 end
 
 function draw_over()
@@ -703,6 +749,10 @@ function draw_win()
 	cprint("congratulations",
 		64,40,2)
 	draw_score_section()
+end
+
+function draw_highscore()
+	print_hs(hs_x)
 end
 
 function draw_wavetext()
@@ -964,8 +1014,12 @@ end
 
 function anim_easing(obj,n)
 		--x+=(targetx-x)/n
-		obj.y+=(obj.posy-obj.y)/n
-		obj.x+=(obj.posx-obj.x)/n
+		ease_in(obj.y,obj.posy,n)
+		ease_in(obj.x,obj.posx,n)
+end
+
+function ease_in(val,dval,n)
+		val+=(dval-val)/n
 end
 
 function del_outside_screen(obj,array)
@@ -1761,6 +1815,92 @@ function explode_boss(x,y)
 		add(particles,particle)
 	end
 	shockwave(x,y,true)
+end
+-->8
+--highscore
+ 
+function reset_hs()
+ --create default values
+ hs={10,300,400,200,1000}
+ hs1={1,1,8,1,1}
+ hs2={1,6,1,1,14}
+ hs3={10,1,1,12,1}
+ save_hs()
+end
+
+function add_hs(score,c1,c2,c3)
+	add(hs,score)
+	add(hs1,c1)
+	add(hs2,c2)
+	add(hs3,c3)
+	sort_hs()
+end
+ 
+function load_hs()
+ local slot=0
+ 
+ if dget(0)==1 then
+  --load the data
+  slot+=1
+  for i=1,5 do
+   hs[i]=dget(slot)
+   hs1[i]=dget(slot+1)
+   hs2[i]=dget(slot+2)
+   hs3[i]=dget(slot+3)
+   slot+=4
+  end
+ else
+  --file is empty
+  reset_hs()
+ end
+end
+ 
+--save the high score list
+function save_hs()
+	sort_hs()
+ local slot
+ dset(0, 1)
+ --load the data
+ slot=1
+ for i=1,5 do
+  dset(slot,hs[i])
+  dset(slot+1,hs1[i])
+  dset(slot+2,hs2[i])
+  dset(slot+3,hs3[i])
+  slot+=4
+ end
+end
+ 
+--prints the high score list
+function print_hs(x)
+ rectfill(x+29,8,x+99,16,8)
+ cprint("high score list",65,10,7)
+ 
+ for i=1,5 do
+  print(i.." - ",x+40,14+7*i,5)
+  
+  local name=hschars[hs1[i]]
+  name=name..hschars[hs2[i]]
+  name=name..hschars[hs3[i]]  
+  print(name,x+55,14+7*i,7)
+
+  local score=" "..hs[i]
+  print(score,(x+100)-(#score*4),14+7*i,7)  
+ end
+end
+
+--insertion sort
+function sort_hs()
+ for i=1,#hs do
+  local j = i
+  while j > 1 and hs[j-1] < hs[j] do
+   hs[j],hs[j-1]=hs[j-1],hs[j]
+   hs1[j],hs1[j-1]=hs1[j-1],hs1[j]
+   hs2[j],hs2[j-1]=hs2[j-1],hs2[j]
+   hs3[j],hs3[j-1]=hs3[j-1],hs3[j]
+   j = j - 1
+  end
+ end
 end
 __gfx__
 00000000000110000001100000011000000000000000000000000000000000000000000000000000000000000220022008800880055005500000000000000000
