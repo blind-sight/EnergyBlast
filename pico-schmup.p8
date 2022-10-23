@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 36
+version 38
 __lua__
 	--main
 	
@@ -7,10 +7,11 @@ __lua__
 	--blinking of score
 	--music to transition
 	--vertical and horizontal lines showing point of death with freeze frame
-
+	--finishing up high score
+	
 function _init()
 	cls(0)
-	cartdata("energy_schmup")
+	cartdata("energy_blast_v1")
 	
 	version="v1"
 	
@@ -25,13 +26,13 @@ function _init()
 	
 	wave=0
 	warp=0
- warp_time=0
+ 	warp_time=0
 	
 	star_colors={
-  split("5,13,6,7"), --gray
-  split("1,13,12,6,7"), --cool
-  split("2,8,9,10,15,7"), --hot
-  split("8,11,12,10,7"), --galaga
+  		split("5,13,6,7"), --gray
+  		split("1,13,12,6,7"), --cool
+  		split("2,8,9,10,15,7"), --hot
+  		split("8,11,12,10,7"), --galaga
 	}
 	star_colors[0]=star_colors[1]
 	start_screen()
@@ -52,15 +53,15 @@ function _init()
 	
 	peekerx=64
 	
-	--highscrore
- hs={}
- hs1={} --first char of name
- hs2={}
- hs3={}
- load_hs()
- hschars={"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"} 
+	--highscore
+ 	hs={}
+ 	hs1={} --first char of name
+ 	hs2={}
+ 	hs3={}
+ 	load_hs()
+	hschars=split("a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z")	
 	hs_x=128
- hs_dx=128
+ 	hs_dx=128
 end
 
 -- (gameplay hard 30fps)
@@ -120,7 +121,7 @@ function start_game()
 	muzzle=0
 	bulltimer=0
 	lastwave=9
-	wave=0
+	wave=1
 	next_wave()
 	
 	ship=make_spr()
@@ -136,6 +137,7 @@ function start_game()
 	enembullets={}
 	enemies={}
 	particles={}	
+	parts={}
 	shockwaves={}
 	pickups={}
 	floats={} --floating elements
@@ -162,8 +164,7 @@ function rand_star(top)
   	cols=star_colors[ceil((wave-1)/3)]
  end
 
- local star=
- {
+ local star={
   x=rnd(128),
   y=rnd(128),
   spd=vperc*2+.5,
@@ -304,6 +305,8 @@ function update_game()
 		muzzle-=1
 	end
 	
+	do_parts()
+	
 	--check if waves is over
 	if mode=="game" and #enemies==0 then
 		enembullets={}
@@ -356,7 +359,7 @@ function update_start()
 	animate_starfield(0.4)	
 	
 	if hs_x~=hs_dx then
-		ease_in(hs_x,hs_dx,5)
+   hs_x+=ease_in(hs_x,hs_dx,5)
 	end
 	
 	if btn(4)==false and btn(5)==false then
@@ -521,6 +524,20 @@ function animate_starfield(spd)
 	 end
  end
 end
+
+
+function do_parts()
+	for p in all(parts) do
+		p.x+=p.dx
+		p.y+=p.dy
+		p.dx*=.9
+		p.dy*=.9
+  		p.age+=1
+  		if p.age>=p.maxage then
+  			del(parts,p)
+  		end		
+	end
+end
 -->8
 --draw
 
@@ -609,12 +626,16 @@ function draw_game()
 	for part in all(particles) do
 		local pc=7
 		
-		if part.blue then
-			pc=part_col_blue(part.age)
+		if part.col~=nil then
+			pc=part.col
 		else
-			pc=part_col_red(part.age)
+				if part.blue then
+					pc=part_col_blue(part.age)
+				else
+				pc=part_col_red(part.age)
+			end
 		end
-		
+	
 		if part.spark then
 			pset(part.x,part.y,7)
 		else
@@ -680,6 +701,9 @@ function draw_game()
 		end
 	end
 	
+	--small particles
+	draw_parts()
+	
 	fprint("score: "..make_score(score),
 		50,2,7,1)	
 	draw_energy_bar()
@@ -687,17 +711,17 @@ end
 
 function draw_energy_bar()
 	local startx=105
- rectfill2(startx+1,3,19,4,1)
- rectfill2(startx+20,4,1,2,1)
- draw_spr(energyicon)
+ 	rectfill2(startx+1,3,19,4,1)
+ 	rectfill2(startx+20,4,1,2,1)
+ 	draw_spr(energyicon)
  
- for i=1,energy do
-  rectfill2(startx+i*2,4,1,2,9)
- end
+ 	for i=1,energy do
+  		rectfill2(startx+i*2,4,1,2,9)
+ 	end
 end
 
 function rectfill2(x,y,w,h,c)
- rectfill(x,y,x+w-1,y+h-1,c)
+ 	rectfill(x,y,x+w-1,y+h-1,c)
 end
 
 function make_score(val)
@@ -716,26 +740,34 @@ function draw_start()
 	draw_starfield()
 	print(version,1,1,1)
 		
+	draw_start_screen(0)
+		
+	print_hs(hs_x)
+end
+
+function draw_start_screen()
+	local shift=(hs_x-128)
 	local sinval=sin(time()/3.5)
-	spr(144,peekerx,32+sinval*7)
+	spr(144,peekerx+shift,32+sinval*7)
 
 	if sinval>-0.2 then
 		peekerx=26+rnd(60)
 	end
 		
-	spr(212,16,30,12,2)
-	cprint("a short shmup",64,48,6)
+	spr(212,16+shift,30,12,2)
+	cprint("a short shmup",64+shift,48,6)
 
 	if highscore>0 then
-		cprint("high score:",64,63,12)
+		cprint("high score:",64+shift,63,12)
 		cprint(make_score(highscore),
-			64,68,12)
+			64+shift,70,12)
 	end
 	
-	cprint("press any key to start",
-		64,90,blink(greyblink))
-		cls(0)
-		print_hs(hs_x)
+	cprint("press ⬅️ for high score list",
+		64+shift,100,12)
+	
+	cprint("press 🅾️ to start",
+		64+shift,90,blink(greyblink))
 end
 
 function draw_over()
@@ -787,6 +819,21 @@ function draw_starfield()
   line(star.x,star.y-star.spd*
     warp,star.x,star.y,star.c)
 	end
+end
+
+function draw_parts()
+	for p in all(parts) do
+		draw_part(p)
+	end
+end
+
+function draw_part(p)
+ local c=p.c
+ if p.a<=10
+ and (p.c==11 or p.c==12) then 
+  c=7
+ end
+ circfill(p.x,p.y,p.r,c)
 end
 -->8
 --tools
@@ -1014,12 +1061,12 @@ end
 
 function anim_easing(obj,n)
 		--x+=(targetx-x)/n
-		ease_in(obj.y,obj.posy,n)
-		ease_in(obj.x,obj.posx,n)
+		obj.y+=ease_in(obj.y,obj.posy,n)
+		obj.x+=ease_in(obj.x,obj.posx,n)
 end
 
 function ease_in(val,dval,n)
-		val+=(dval-val)/n
+		return (dval-val)/n
 end
 
 function del_outside_screen(obj,array)
@@ -1179,23 +1226,23 @@ function next_wave()
 		btnlockout=t+30
 		music(4)
 	else
-	 if wave==1 then
-   --music(1)
-  else
-   --music(3)  
-  end
+	 	if wave==1 then
+   			--music(1)
+  		else
+   			--music(3)  
+  		end
   
-  wavetime=t+200
+  		wavetime=t+200
 		mode="wavetext"
 		initialize_warp()
 	end
 end
 
 function initialize_warp()
- warp=0
- warp_mode="in"
- warp_time=200
- sfx(52)
+	warp=0
+ 	warp_mode="in"
+ 	warp_time=200
+ 	sfx(52)
 end
 
 function spawn_enemy(type,x,y,w)
@@ -1212,7 +1259,7 @@ function spawn_enemy(type,x,y,w)
 	if type==nil or type==1 then
 		enemy.spr=21
 		enemy.hp=3
-		enemy.anim={144,145,146,147}
+		enemy.anim={144,144,145,145,144,146,146,147,147,146,146}
 		enemy.score=1
 	elseif type==2 then
 		enemy.spr=148
@@ -1479,10 +1526,24 @@ function drop_pickup(x,y)
 	add(pickups,pickup)
 end
 
+function add_part(x,y,dx,dy,radius,color,maxage)
+	add(parts,{
+		x=x,y=y,
+		dx=dx,dy=dy,
+		radius=radius,
+		color=color,
+		maxage=maxage,
+		age=0
+	})
+end
+
 function decide_pickup(pickup)
 	energy+=1
-	shockwave(pickup.x,pickup.y,false)
-	
+	shockwave(pickup.x,pickup.y,
+		false)
+		
+	local part_col=10
+
 	if energy>=energy_max then
 		if ship.lives.curr<ship.lives.max then
 			ship.lives.curr+=1
@@ -1490,6 +1551,7 @@ function decide_pickup(pickup)
 			energy=0
 			pop_float("1up!",pickup.x,
 				pickup.y)
+			part_col=11
 		else
 			pop_float(make_score(50),pickup.x,
 				pickup.y)
@@ -1500,6 +1562,14 @@ function decide_pickup(pickup)
 	else
 		sfx(30)
 	end
+	
+	for j=1,16 do
+  local rn=rnd()
+  local rn2=rnd(.5)
+ 	add_part(pickup.x,pickup.y,
+ 		sin(rn)*rn2*3,cos(rn)*rn2*3,
+ 		1,part_col,32)
+ end	
 end
 
 function animate(enemy)
@@ -1510,7 +1580,6 @@ function animate(enemy)
 
 	enemy.spr=enemy.anim[flr(enemy.animframe)]
 end
-
 
 -->8
 --bullets
@@ -1874,18 +1943,21 @@ end
 --prints the high score list
 function print_hs(x)
  rectfill(x+29,8,x+99,16,8)
- cprint("high score list",65,10,7)
+ cprint("high score list",x+65,10,7)
  
  for i=1,5 do
-  print(i.." - ",x+40,14+7*i,5)
-  
+  fprint(i.." - ",x+30,14+7*i,5)
+  local col=7
+  if i==1 then
+  	col=blink(greyblink)
+  end
   local name=hschars[hs1[i]]
   name=name..hschars[hs2[i]]
   name=name..hschars[hs3[i]]  
-  print(name,x+55,14+7*i,7)
+  fprint(name,x+45,14+7*i,col)
 
   local score=" "..hs[i]
-  print(score,(x+100)-(#score*4),14+7*i,7)  
+  fprint(score,(x+100)-(#score*4),14+7*i,col)  
  end
 end
 
@@ -1978,8 +2050,8 @@ c333333bb33333bbbb33333bb333333cc3773efff77f17711111f77fffe3773cc3773efff77f1771
 03300330033003300330033003300330200000020200002000000000000000000000000000000000000000000000000000000000000000000000000000000000
 33b33b3333b33b3333b33b3333b33b33220000222200002200000000000000000000000000000000000000000000000000000000000000000000000000000000
 3bbbbbb33bbbbbb33bbbbbb33bbbbbb3222222222222222200000000000000000000000000000000000000000000000000000000000000000000000000000000
-3b7717b33b7717b33b7717b33b7717b3282222822822228200000000000000000000000000000000000000000000000000000000000000000000000000000000
-0b7117b00b7117b00b7117b00b7117b0288888822888888200000000000000000000000000000000000000000000000000000000000000000000000000000000
+3b7bb7b33b7bb1b33b7bb7b33b1bb7b3282222822822228200000000000000000000000000000000000000000000000000000000000000000000000000000000
+0b7117b00b7711b00b7117b00b1177b0288888822888888200000000000000000000000000000000000000000000000000000000000000000000000000000000
 00377300003773000037730000377300287887822878878200000000000000000000000000000000000000000000000000000000000000000000000000000000
 03033030030330300303303003033030288888820800008000000000000000000000000000000000000000000000000000000000000000000000000000000000
 03000030300000030300003003300330080000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
