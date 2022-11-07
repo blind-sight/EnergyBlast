@@ -7,7 +7,6 @@ __lua__
 	--blinking of score
 	--music to transition
 	--vertical and horizontal lines showing point of death with freeze frame
-	--finishing up high score
 	
 function _init()
 	cls(0)
@@ -23,16 +22,17 @@ function _init()
 	--blinking text anim
 	whiteblink={5,6,7,6,5}
 	greyblink={5,13,6,7,6,13}
+	yellowblink={9,10,7,10,7,9}
 	
 	wave=0
 	warp=0
  warp_time=0
 	
 	star_colors={
-  		split("5,13,6,7"), --gray
-  		split("1,13,12,6,7"), --cool
-  		split("2,8,9,10,15,7"), --hot
-  		split("8,11,12,10,7"), --galaga
+ 	split("5,13,6,7"), --gray
+  split("1,13,12,6,7"), --cool
+  split("2,8,9,10,15,7"), --hot
+  split("8,11,12,10,7"), --galaga
 	}
 	star_colors[0]=star_colors[1]
 	start_screen()
@@ -43,7 +43,7 @@ function _init()
 	btnlockout=0
 	blinkt=0
 	t=0 --number of frames
-	
+
 	energyicon=make_spr()
 	energyicon.spr=48
 	energyicon.x=100
@@ -56,16 +56,19 @@ function _init()
  hs1={} --first char of name
  hs2={}
  hs3={}
+ hsb={true,false,false,false,false} --blink of a score
  load_hs()
 	hschars=split("a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z")	
 	hs_x=128
- hs_dx=128
+ hs_dx=128 
 end
 
 -- (gameplay hard 30fps)
 function _update()
 	blinkt+=1
 	t+=1
+	
+	debug=mode
 	
 	if mode=="game" then
 		update_game()
@@ -77,21 +80,17 @@ function _update()
 		update_over()
 	elseif mode=="win" then
 		update_win()
-	elseif mode=="highscore" then
-		update_highscore()
 	end
 end
 
 -- (soft 30 fps)
 function _draw()
-
 	shake_screen()
 	
 	if mode=="game" then
 		draw_game()
 	elseif mode=="start" then
 		draw_start()
-		--draw_hs()
 	elseif mode=="wavetext" then
 		draw_wavetext()
 	elseif mode=="over" then
@@ -113,13 +112,18 @@ function start_screen()
 end
 
 function start_game()
+ initials={1,1,1}
+ initials_sel=1
+ initials_conf=false
+ loghs=false
+
 	score=0
-	energy=9
+	energy=0
 	energy_max=10
 	muzzle=0
 	bulltimer=0
 	lastwave=9
-	wave=1
+	wave=0
 	next_wave()
 	
 	ship=make_spr()
@@ -128,7 +132,7 @@ function start_game()
 	ship.spr=2
 	ship.spx=0
 	ship.spy=0
-	ship.lives={max=4,curr=3}
+	ship.lives={max=4,curr=1}
 	ship.invul=0 --invulnerability
 	
 	bullets={}
@@ -327,6 +331,9 @@ function update_game()
 		ship.y=120
 		sfx(0)
 	end
+	
+	mode="win"
+	loghs=true
 end
 
 function ship_hit()
@@ -334,23 +341,8 @@ function ship_hit()
 	ship.lives.curr-=1
 	shake=8
 	flash=3
-	sfx(1)
+	sfx(2)
 	ship.invul=60
-end
-
-function update_highscore()
-	animate_starfield()
-	
-	if btn(4)==false and btn(5)==false then
-		btnreleased=true
-	end
-
-	if btnreleased then
-		if btnp(4) or btnp(5) then
-			start_screen()
-			btnreleased=false
-		end
-	end
 end
 
 function update_start()
@@ -369,13 +361,17 @@ function update_start()
 			start_game()
 			btnreleased=false
 		elseif btnp(0) then
-			hs_dx=0
-		elseif btn(1) then
-			hs_dx=128
+			if hs_dx~=0 then
+				hs_dx=0
+				sfx(58)
+			end
+		elseif btn(1) then			
+			if hs_dx~=128 then
+				hs_dx=128
+				sfx(58)
+			end
 		end
 	end
-	
-	debug=hs_dx
 end
 
 function update_over()
@@ -385,12 +381,74 @@ function update_over()
 
 	if btnreleased then
 		if btnp(4) or btnp(5) then
-			if score>highscore then
-				highscore=score
-				dset(0,score)
-			end
+				start_screen()
+				btnreleased=false
+				reset_hsb()
+		end
+	end
+end
+
+function handle_hs()
+	if btnp(0) then
+		sfx(54)
+		if initials_conf then
+			initials_conf=false
+			sfx(56)
+		end
+		initials_conf=false
+		initials_sel-=1
+		if initials_sel<1 then
+			initials_sel=3
+		end
+	end
+	if btnp(1) then
+		sfx(54)
+		if initials_conf then
+			initials_conf=false
+			sfx(56)
+		end
+		initials_conf=false
+		initials_sel+=1
+		if initials_sel>3 then
+			initials_sel=1
+		end
+	end
+	if btnp(2) then
+		sfx(53)
+		if initials_conf then
+			initials_conf=false
+			sfx(56)
+		end
+		initials_conf=false
+		initials[initials_sel]-=1
+		if initials[initials_sel]<1 then
+			initials[initials_sel]=#hschars
+		end
+	end
+	if btnp(3) then
+		sfx(53)
+		if initials_conf then
+			initials_conf=false
+			sfx(56)
+		end
+		initials[initials_sel]+=1
+		if initials[initials_sel]>#hschars then
+			initials[initials_sel]=1
+		end
+	end
+	if btnp(4) then
+		sfx(55)
+		if initials_conf then
+			add_hs(score,initials[1],initials[2],initials[3])
 			start_screen()
-			btnreleased=false
+		else
+			initials_conf=true
+		end
+	end
+	if btnp(5) then
+		if initials_conf then
+			sfx(56)
+			initials_conf=false
 		end
 	end
 end
@@ -405,13 +463,14 @@ function update_win()
 	end
 
 	if btnreleased then
-		if btnp(4) or btnp(5) then
-			if score>highscore then
-				highscore=score
-				dset(0,score)
+		if loghs then
+			handle_hs()
+		else	
+			if btnp(4) or btnp(5) then
+				start_screen()
+				btnreleased=false
+				reset_hsb()
 			end
-			start_screen()
-			btnreleased=false
 		end
 	end
 end
@@ -749,35 +808,28 @@ function draw_start_screen()
 	spr(132,16+shift,20,12,5)
 	cprint("a short shmup",
 		64+shift,62,6)
-
-	if highscore>0 then
-		--cprint("high score:",64+shift,63,12)
-		--cprint(make_score(highscore),
---			64+shift,70,12)
-	end
 	
 	cprint("press ⬅️ for high score list",
 		64+shift,100,12)
-	
+	cprint("press ➡️ for main screen",
+		shift+193,100,12)
+		
 	cprint("press 🅾️ to start",
-		64+shift,90,blink(greyblink))
+		64,90,blink(greyblink))
 end
 
 function draw_over()
 	draw_game()
 	cprint("game over",64,40,8)
-	draw_score_section()
+	cprint("score: "..make_score(score),
+			64,50,blink(yellowblink))
+	cprint("press any key to continue",
+			64,90,blink(greyblink))
 end
 
 function draw_win()
 	draw_game()
-	cprint("congratulations",
-		64,40,2)
 	draw_score_section()
-end
-
-function draw_highscore()
-	print_hs(hs_x)
 end
 
 function draw_wavetext()
@@ -792,19 +844,41 @@ function draw_wavetext()
 end
 
 function draw_score_section()
-	cprint("score: "..make_score(score),
-		64,60,12)
-	if score>highscore then
-		local col=7
-		if t%4<2 then
-			col=10
+	if loghs then
+		cprint("★congratulations!★",
+			64,30,12)
+		cprint("you have a new highscore!",
+			64,40,blink(yellowblink))
+		cprint(make_score(score),
+			64,50,blink(yellowblink))
+		cprint("enter your initials",
+			64,60,2)
+		local colors={10,10,10}
+		
+		if initials_conf then
+			colors={10,10,10}
+		else
+			colors[initials_sel]=blink(whiteblink)
 		end
-		cprint("new highscore!",
-			64,66,col)
-	end
+		
+		cprint(hschars[initials[1]],58,70,colors[1])
+		cprint(hschars[initials[2]],62,70,colors[2])
+		cprint(hschars[initials[3]],66,70,colors[3])
 	
-	cprint("press any key to continue",
-		64,90,blink(greyblink))
+		if initials_conf then
+			cprint("press ❎ to confirm",
+				64,80,blink(whiteblink))
+		else
+			cprint("use ⬅️➡️⬆️⬇️❎",56,80,2)
+		end
+	else
+		cprint("★congratulations!★",
+			64,40,12)
+		cprint("score: "..make_score(score),
+			64,50,blink(yellowblink))
+		cprint("press any key to continue",
+			64,90,blink(greyblink))
+	end
 end
 
 function draw_starfield()	
@@ -1218,14 +1292,16 @@ function next_wave()
 		mode="win"
 		btnlockout=t+30
 		music(4)
+		
+		if score>hs[5] then
+			loghs=true
+			initials_conf=false
+			initials_sel=1
+		else
+			reset_hsb()
+		end
 	else
-	 	if wave==1 then
-   			--music(1)
-  		else
-   			--music(3)  
-  		end
-  
-  		wavetime=t+200
+  wavetime=t+200
 		mode="wavetext"
 		initialize_warp()
 	end
@@ -1887,6 +1963,7 @@ function reset_hs()
  hs1={1,1,8,1,1}
  hs2={1,6,1,1,14}
  hs3={10,1,1,12,1}
+ hsb={true,false,false,false,false}
  save_hs()
 end
 
@@ -1895,7 +1972,11 @@ function add_hs(score,c1,c2,c3)
 	add(hs1,c1)
 	add(hs2,c2)
 	add(hs3,c3)
-	sort_hs()
+	for i=1,#hsb do
+		hsb[i]=false
+	end
+	add(hsb,true)
+	save_hs()
 end
  
 function load_hs()
@@ -1917,7 +1998,6 @@ function load_hs()
  end
 end
  
---save the high score list
 function save_hs()
 	sort_hs()
  local slot
@@ -1933,15 +2013,15 @@ function save_hs()
  end
 end
  
---prints the high score list
 function print_hs(x)
  rectfill(x+29,8,x+99,16,8)
- cprint("high score list",x+65,10,7)
+ cprint("high score list",
+ 	x+65,10,7)
  
  for i=1,5 do
   fprint(i.." - ",x+30,14+7*i,5)
   local col=7
-  if i==1 then
+  if hsb[i] then
   	col=blink(greyblink)
   end
   local name=hschars[hs1[i]]
@@ -1954,16 +2034,24 @@ function print_hs(x)
  end
 end
 
+function reset_hsb()
+	for i=1,#hsb do
+		hsb[i]=false
+	end
+	hsb[1]=true
+end
+
 --insertion sort
 function sort_hs()
  for i=1,#hs do
-  local j = i
-  while j > 1 and hs[j-1] < hs[j] do
+  local j=i
+  while j>1 and hs[j-1]<hs[j] do
    hs[j],hs[j-1]=hs[j-1],hs[j]
    hs1[j],hs1[j-1]=hs1[j-1],hs1[j]
    hs2[j],hs2[j-1]=hs2[j-1],hs2[j]
    hs3[j],hs3[j-1]=hs3[j-1],hs3[j]
-   j = j - 1
+   hsb[j],hsb[j-1]=hsb[j-1],hsb[j]
+   j=j-1
   end
  end
 end
@@ -2150,6 +2238,12 @@ __sfx__
 5c030000131212513131151381711b1613b1513b1413c14116141291413913135131321312d13228132221321c13216132131321d1320e1320d1320a132091320813206122051220412203122031220312201120
 5c0400000817120161181610f17108171171711017109171071710d1610f161091510715106151051410514105132041320313202132021320113201132001320113201132011320112200122001220012200122
 7a0c000003610076200a6300b6400c6400c6500c6500c6500c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6600c6500c6500c6500b6400a640076300562001610
+00030000344503d450004000040000400004000040000400004000040000400004002140000400004000040000400004000040000400004000040000400004000040000400004000040000400004000040000400
+000200000d42012420000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010300002805128051310303103036000390001f0001f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002e0502e050280302803000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010300002805128051310303103036030390301f0301f0302803128031310303103036030390301f0101f01028010280103101031010360103901010010100102801028010310103101036010390161001610016
+000100000c6101061012610176101c6101f61021610256102c610336203a6203a620396203762037620256201c61019610186101661014610116100c610096100261012600006001160011600116000000000000
 __music__
 00 04050644
 00 07084749
