@@ -3,11 +3,6 @@ version 38
 __lua__
 	--main
 	
-	--todo
-	--blinking of score
-	--music to transition
-	--vertical and horizontal lines showing point of death with freeze frame
-	
 function _init()
 	cls(0)
 	cartdata("energy_blast_v1")
@@ -41,7 +36,6 @@ function _init()
 	shake=0
 	flash=0
 	btnlockout=0
-	blinkt=0
 	t=0 --number of frames
 
 	energyicon=make_spr()
@@ -65,11 +59,8 @@ end
 
 -- (gameplay hard 30fps)
 function _update()
-	blinkt+=1
 	t+=1
-	
-	debug=mode
-	
+
 	if mode=="game" then
 		update_game()
 	elseif mode=="start" then
@@ -97,10 +88,8 @@ function _draw()
 		draw_over()
 	elseif mode=="win" then
 		draw_win()
-	elseif mode=="highscore" then
-		draw_highscore()
 	end
-	
+
 	camera()
 	print(debug,2,9,7)
 end
@@ -113,9 +102,9 @@ end
 
 function start_game()
  initials={1,1,1}
- initials_sel=1
+ initials_sel=1 --initials selection
  initials_conf=false
- loghs=false
+ loghs=false --log high score
 
 	score=0
 	energy=0
@@ -132,14 +121,14 @@ function start_game()
 	ship.spr=2
 	ship.spx=0
 	ship.spy=0
-	ship.lives={max=4,curr=1}
+	ship.lives={max=4,curr=4}
 	ship.invul=0 --invulnerability
 	
 	bullets={}
 	enembullets={}
 	enemies={}
 	particles={}	
-	parts={}
+	smallparticles={}
 	shockwaves={}
 	pickups={}
 	floats={} --floating elements
@@ -185,29 +174,57 @@ end
 
 function update_game()
 	handle_ship_controls()
+	move_bullets()
+	move_pickups()
+	move_enemy_bullets()	
+	move_enemies()
+	collision_enemies_x_bullets()
+	collision_enem_bullets_x_bullets()
+	collision_ship_x_enemies()
+	collision_ship_x_pickups()
+	collision_ship_x_enemy_bullets()
+	pick_timer()
+	move_small_particles()
+
+	if ship.lives.curr<=0 then
+		mode="over"
+		btnlockout=t+30
+		music(6)
+		return
+	end
 	
-	--moving bullets
+	--check if waves is over
+	if mode=="game" and #enemies==0 then
+		enembullets={}
+		next_wave()
+	end
+end
+
+function move_bullets() 
 	for bull in all (bullets) do
 		move(bull)
 		
 		del_outside_screen(bull,bullets)
 	end
-	
-	--moving pickups
+end
+
+function move_pickups() 
 	for pickup in all (pickups) do
 		move(pickup)
 		
 		del_outside_screen(pickup,pickups)
 	end
-	
-	--move enemy bullets
+end
+
+function move_enemy_bullets() 
 	for enembull in all (enembullets) do
 		move(enembull)
 		animate(enembull)		
 		del_outside_screen(enembull,enembullets)
 	end
-	
-	--moving enemies
+end
+
+function move_enemies() 
 	for enemy in all(enemies) do
 	 execute_behavior(enemy)
 		
@@ -218,8 +235,9 @@ function update_game()
 			del_outside_screen(enemy,enemies)
 		end
 	end
-	
-	--collision enemies x bullets
+end
+
+function collision_enemies_x_bullets() 
 	for enemy in all(enemies) do
 		for bull in all(bullets) do
 			if collision(enemy,bull) then
@@ -243,9 +261,9 @@ function update_game()
 			end
 		end
 	end
-	
-	--collision 
-	-- enemy bullets x bullets
+end
+
+function collision_enem_bullets_x_bullets()
 	for bull in all(bullets) do
 		--check if energy bullet
 		if bull.spr==17 then
@@ -258,8 +276,9 @@ function update_game()
 			end
 		end
 	end
-	
-	--collision ship x enemies
+end
+
+function collision_ship_x_enemies()
 	if ship.invul==0 then
 		for enemy in all(enemies) do
 			if collision(enemy,ship) then			
@@ -269,16 +288,18 @@ function update_game()
 	else 
 		ship.invul-=1
 	end
-	
-	--collision ship x pickups
+end
+
+function collision_ship_x_pickups()
 	for pickup in all(pickups) do
 		if collision(pickup,ship) then			
 			decide_pickup(pickup)
 			del(pickups,pickup)
 		end
 	end
-	
-	--collision ship x enemy bullets
+end
+
+function collision_ship_x_enemy_bullets()
 	if ship.invul==0 then
 		for enembull in all(enembullets) do
 			if collision(enembull,ship) then			
@@ -286,54 +307,6 @@ function update_game()
 			end
 		end
 	end
-	
-	if ship.lives.curr<=0 then
-		mode="over"
-		btnlockout=t+30
-		music(6)
-		return
-	end
-	
-	pick_timer()
-	
-	--animate flame
-	flameani+=0.5
-	if flameani>3 then
-		flameani=0
-	end
-	
-	--animate muzzle flash
-	if muzzle>0 then
-		muzzle-=1
-	end
-	
-	do_parts()
-	
-	--check if waves is over
-	if mode=="game" and #enemies==0 then
-		enembullets={}
-		next_wave()
-	end
-	
-	--checking edges
-	if ship.x>120 then
-		ship.x=120
-		sfx(0)
-	elseif ship.x<0 then
-		ship.x=0
-		sfx(0)
-	end
-	if ship.y<0 then
-		ship.y=0
-		sfx(0)
-	end
-	if ship.y>120 then
-		ship.y=120
-		sfx(0)
-	end
-	
-	mode="win"
-	loghs=true
 end
 
 function ship_hit()
@@ -509,15 +482,13 @@ function handle_ship_controls()
 	
 	if btnp(4) then
 		if energy>0 then
-			energybomb()
+			energy_bomb()
 			energy=0
 		else
 			sfx(32)
 		end
 	end
 	
-	-- need to press btn
-	-- each time to fire
 	if btn(5) then
 		if bulltimer<=0 then
 			local bullet=make_spr()
@@ -537,6 +508,34 @@ function handle_ship_controls()
 	bulltimer-=1
 	
 	move(ship)
+
+	--animate flame
+	flameani+=0.5
+	if flameani>3 then
+		flameani=0
+	end
+	
+	--animate muzzle flash
+	if muzzle>0 then
+		muzzle-=1
+	end
+
+	--checking edges
+	if ship.x>120 then
+		ship.x=120
+		sfx(0)
+	elseif ship.x<0 then
+		ship.x=0
+		sfx(0)
+	end
+	if ship.y<0 then
+		ship.y=0
+		sfx(0)
+	end
+	if ship.y>120 then
+		ship.y=120
+		sfx(0)
+	end
 end
 
 function animate_starfield(spd)
@@ -582,15 +581,15 @@ function animate_starfield(spd)
  end
 end
 
-function do_parts()
-	for p in all(parts) do
-		p.x+=p.dx
-		p.y+=p.dy
-		p.dx*=.9
-		p.dy*=.9
-  p.age+=1
-  if p.age>=p.maxage then
-  	del(parts,p)
+function move_small_particles()
+	for particle in all(smallparticles) do
+		particle.x+=particle.dx
+		particle.y+=particle.dy
+		particle.dx*=.9
+		particle.dy*=.9
+  particle.age+=1
+  if particle.age>=particle.maxage then
+  	del(smallparticles,particle)
   end		
 	end
 end
@@ -607,8 +606,19 @@ function draw_game()
 	
 	draw_starfield()	
 	animate_starfield()
-	
-	--ship
+	draw_ship()
+	draw_hyperspace_trail()
+	draw_bullets()
+	draw_pickups()
+	draw_enemies()
+	draw_particles()
+	draw_shockwaves()
+	draw_floats()
+	draw_small_particles()
+	draw_interface()
+end
+
+function draw_ship()
 	if ship.lives.curr>0 then
 		if ship.invul<=0 then
 			draw_spr(ship)
@@ -621,22 +631,26 @@ function draw_game()
 			end
 		end
 	end
-	
- --draw hyperspace trail
- if warp_time>0 then
-  local w=abs(3*sin(t/20))+.1
-  rectfill2(ship.x+4-w,
-   ship.y+9,w+1,200-warp_time,7)
-  rectfill2(ship.x+4,
-   ship.y+9,w+1,200-warp_time,7)
- end
-	
-	--bullets
-	for bull in all(bullets) do
-		draw_spr(bull)
+
+	if muzzle>0 then
+		circfill(ship.x+3,ship.y-1,
+			muzzle,7)
+		circfill(ship.x+4,ship.y-1,
+			muzzle,7)
 	end
-	
-	--pickups
+end
+
+function draw_hyperspace_trail()
+  if warp_time>0 then
+    local w=abs(3*sin(t/20))+.1
+    rectfill2(ship.x+4-w,
+    ship.y+9,w+1,200-warp_time,7)
+  	rectfill2(ship.x+4,
+   	ship.y+9,w+1,200-warp_time,7)
+  end
+end
+
+function draw_pickups()
 	for pickup in all(pickups) do
 		local col=7
 		if t%4<2 then
@@ -650,8 +664,9 @@ function draw_game()
 		pal()
 		draw_spr(pickup)
 	end
-	
-	--enemies
+end
+
+function draw_enemies()
 	for enemy in all(enemies) do
 		if enemy.flash>0 then
 			enemy.flash-=1
@@ -670,15 +685,9 @@ function draw_game()
 		draw_spr(enemy)
 		pal() --reset color
 	end
-	
-	if muzzle>0 then
-		circfill(ship.x+3,ship.y-1,
-			muzzle,7)
-		circfill(ship.x+4,ship.y-1,
-			muzzle,7)
-	end
-	
-	--particles
+end
+
+function draw_particles()
 	for part in all(particles) do
 		local pc=7
 		
@@ -712,8 +721,9 @@ function draw_game()
 			end
 		end
 	end
-	
-	--shockwaves
+end
+
+function draw_shockwaves()
 	for shock in all(shockwaves) do
 		circ(shock.x+4,shock.y+4,
 			shock.r,shock.col)
@@ -722,13 +732,9 @@ function draw_game()
 			del(shockwaves,shock)
 		end
 	end
-	
-	--enemy bullets
-	for enembull in all(enembullets) do
-		draw_spr(enembull)
-	end
-	
-	--floats
+end
+
+function draw_floats()
 	for float in all(floats) do
 		local col=7
 		if t%4<2 then
@@ -742,27 +748,36 @@ function draw_game()
 			del(floats,float)
 		end
 	end
-	
+end
+
+function draw_interface()
 	for i=1,ship.lives.max do 
 		if ship.lives.curr>=i then
+			local heartspr=12
 			if ship.lives.curr<ship.lives.max 
 				and t%25<11 then
 					heartspr=11
-			else
-					heartspr=12
 			end
 			spr(heartspr,i*9,1)
 		else
 			spr(emptyheartspr,i*9,1)
 		end
 	end
-	
-	--small particles
-	draw_parts()
-	
+		
 	fprint("score: "..make_score(score),
 		50,2,7,1)	
 	draw_energy_bar()
+end
+
+function draw_bullets()
+	--bullets
+	for bull in all(bullets) do
+		draw_spr(bull)
+	end
+		--enemy bullets
+	for enembull in all(enembullets) do
+		draw_spr(enembull)
+	end
 end
 
 function draw_energy_bar()
@@ -835,8 +850,8 @@ end
 function draw_wavetext()
 	draw_game()
 	if wave==lastwave then
-		cprint("final wave!"..wave .." of "
-		.. lastwave,64,40,blink(whiteblink))
+		cprint("final wave!",
+			64,40,blink(whiteblink))
 	else
 		cprint("wave "..wave .." of "
 		.. lastwave,64,40,blink(greyblink),1)
@@ -888,19 +903,19 @@ function draw_starfield()
 	end
 end
 
-function draw_parts()
-	for p in all(parts) do
-		draw_part(p)
+function draw_small_particles()
+	for particle in all(smallparticles) do
+		draw_particle(particle)
 	end
 end
 
-function draw_part(p)
- local c=p.c
+function draw_particle(p)
+ local c=p.color
  if p.age<=10
- 	and (p.c==11 or p.c==12) then 
+ 	and (c==11 or c==12) then 
   c=7
  end
- circfill(p.x,p.y,p.r,c)
+ circfill(p.x,p.y,p.radius,c)
 end
 -->8
 --tools
@@ -1351,19 +1366,16 @@ function spawn_enemy(type,x,y,w)
 		enemy.score=5
 	elseif type==5 then
 		enemy.spr=68
-		enemy.hp=200
+		enemy.hp=2
 		enemy.sprw=4
 		enemy.sprh=3
 		enemy.anim={68,72,76,72}
 		enemy.colw=32
-		enemy.colh=24	
-		
+		enemy.colh=24		
 		enemy.x=48
 		enemy.y=-24
-		
 		enemy.posx=48
 		enemy.posy=25
-		
 		enemy.isboss=true
 	end
 	
@@ -1400,7 +1412,7 @@ function execute_behavior(enemy)
 			end
 		end
 	elseif enemy.behavior=="hover" then
-		behavior_hover(enemy)
+		--do nothing
 	elseif enemy.behavior=="attack" then
 		behavior_attack(enemy)
 	elseif enemy.behavior=="boss-p1" then
@@ -1414,10 +1426,6 @@ function execute_behavior(enemy)
 	elseif enemy.behavior=="boss-p5" then
 		boss_phase_5(enemy)
 	end
-end
-
-function behavior_hover(enemy)
-	
 end
 
 function behavior_attack(enemy)
@@ -1529,7 +1537,7 @@ function pick_fire()
 		if enemy.type==4 then
 			firespread(enemy,12,1.3,rnd())
 		elseif enemy.type==2 then
-			aimedfire(enemy,2)
+			aimed_fire(enemy,2)
 		else
 			fire(enemy,0,2)
 		end
@@ -1543,7 +1551,6 @@ end
 
 function kill_enemy(enemy)
 	if enemy.isboss then
-		debug="killed"
 		enemy.behavior="boss-p5"
 		enemy.phasebegin=t
 		enemy.isghost=true
@@ -1595,8 +1602,8 @@ function drop_pickup(x,y)
 	add(pickups,pickup)
 end
 
-function add_part(x,y,dx,dy,radius,color,maxage)
-	add(parts,{
+function add_particle(x,y,dx,dy,radius,color,maxage)
+	add(smallparticles,{
 		x=x,y=y,
 		dx=dx,dy=dy,
 		radius=radius,
@@ -1613,7 +1620,7 @@ function decide_pickup(pickup)
 		
 	local part_col=10
 
-	if energy>=energy_max then
+	if energy>=energy_max-1 then
 		if ship.lives.curr<ship.lives.max then
 			ship.lives.curr+=1
 			sfx(31)
@@ -1635,7 +1642,7 @@ function decide_pickup(pickup)
 	for j=1,16 do
   local rn=rnd()
   local rn2=rnd(.5)
- 	add_part(pickup.x,pickup.y,
+ 	add_particle(pickup.x,pickup.y,
  		sin(rn)*rn2*3,cos(rn)*rn2*3,
  		1,part_col,32)
  end	
@@ -1701,7 +1708,7 @@ function firespread(enemy,num,
 		end
 end
 
-function aimedfire(enemy,spd)
+function aimed_fire(enemy,spd)
 	local enemybull=fire(enemy,0,spd)
 	
 	--angle between two points
@@ -1712,7 +1719,7 @@ function aimedfire(enemy,spd)
 	enemybull.spy=cos(ang)*spd
 end
 
-function energybomb()
+function energy_bomb()
 	local spacing=0.25/(energy*2)
 	for i=0,energy*2 do
 		local ang=0.375+spacing*i
@@ -1797,7 +1804,7 @@ function boss_phase_2(boss)
 	
 	--shooting
 	if t%10==0 then
-		aimedfire(boss,spd)
+		aimed_fire(boss,spd)
 	end
 	
 	move(boss)
@@ -1899,7 +1906,7 @@ function boss_phase_5(boss)
 	if boss.phasebegin+6*30<t then
 		score+=100
 		pop_float(make_score(100),
-			enemy.x+16,enemy.y+12)
+			boss.x+16,boss.y+12)
 		explode_boss(boss.x+16,boss.y+12)
 		shake=15
 		flash=3
@@ -2152,14 +2159,14 @@ d51aa15d0d51a15000d55d00051a15d0ccccc0000000000000000000000000000000000000000000
 0007500000075000000750000007500000009999aaa77777aaa999990000000ccccc0000ccccc0000ccccc00000011111111cccccccccc11111100000ccccc11
 000750000007500000075000000750000000000999aaa7aaa99900000000000cccccccccccccccc00ccccccc000000000000cccccccccc00000000000ccccc10
 0006000000060000000600000006000000000a000999a7a999000a000000000cccccccccccccccc00ccccccc000000000000cccccccccc00000000000ccccc00
-0007033000700000007d33000000000000000a000009aaa900000a000000000ccccccc1111ccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccc00
-000d3300000d3300002883300000000000000a0009099a9909000a000000000ccccccc1000ccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccc00
-0778827000288330071ffd100000000000000a0090009a9000900a000000000ccccccc0000ccccc00ccccccc00ccccc11cccccccc1111111ccccccc00ccccc00
-071ffd10077ffd7007788270000000000000000900009990000900000000000ccccccc0000ccccc00ccccccc00ccccc10cccccccc1000000ccccccc00ccccccc
-002882000718821000288200000000000000009000000900000000000000000ccccccc0000ccccc00ccccccc00ccccc00cccccccc0000000ccccccc00ccccccc
-07d882d00028820007d882d00000000000000900aaaa090aaaaa00000000000cccccccccccccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccccc
-0028820007d882d000dffd00000000000000900000000900000000900000000cccccccccccccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccccc
-00dffd0000dffd000000000000000000000000000000000000000000000000011111111111111100011111100011111111111111111111111111110001111110
+0000000000000000000000000000000000000a000009aaa900000a000000000ccccccc1111ccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccc00
+0000000000000000000000000000000000000a0009099a9909000a000000000ccccccc1000ccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccc00
+0000000000000000000000000000000000000a0090009a9000900a000000000ccccccc0000ccccc00ccccccc00ccccc11cccccccc1111111ccccccc00ccccc00
+000000000000000000000000000000000000000900009990000900000000000ccccccc0000ccccc00ccccccc00ccccc10cccccccc1000000ccccccc00ccccccc
+000000000000000000000000000000000000009000000900000000000000000ccccccc0000ccccc00ccccccc00ccccc00cccccccc0000000ccccccc00ccccccc
+0000000000000000000000000000000000000900aaaa090aaaaa00000000000cccccccccccccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccccc
+000000000000000000000000000000000000900000000900000000900000000cccccccccccccccc00ccccccc00ccccccccccccccccccccccccccccc00ccccccc
+00000000000000000000000000000000000000000000000000000000000000011111111111111100011111100011111111111111111111111111110001111110
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000149aa94100000000012222100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2175,15 +2182,6 @@ d51aa15d0d51a15000d55d00051a15d0ccccc0000000000000000000000000000000000000000000
 00a001944a100a0000400149a4100400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000049a400090000a0000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-03330333000000000022220000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-03bb3bb3000000000888882000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00884200002882000888882000288200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-08ee8e800333e33308ee8e80088ee883000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-08ee8e8003bb4bb308ee8e8008eeee83000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0888882008eeee800088420008eeee80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-08888820088ee88003bb3bb3088ee880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00222200002882000333033300288200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 000100001e7301d7401d760127601177012770207701e7701d7701977019770187701777017770167701677016770197601b7601e760207502375024740247402373022730207301f7301e7301d7301b73017730
 0002000032520305202c5202952025520225201e5201b5201652012520105200d5200b52009520075200552004520035200251001510000000000000000000000000000000000000000000000000000000000000
